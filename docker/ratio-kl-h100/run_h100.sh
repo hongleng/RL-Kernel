@@ -39,10 +39,9 @@ for dtype in float16 bfloat16; do
   for side in base head; do
     tree=$BASE_TREE
     [[ $side == head ]] && tree=$HEAD_TREE
-    run_case "$side" "$tree" "$dtype" n256-v8192 1 1 256 8192
-    run_case "$side" "$tree" "$dtype" n512-v8192 1 1 512 8192
-    run_case "$side" "$tree" "$dtype" n256-v16384 1 1 256 16384
-    run_case "$side" "$tree" "$dtype" n128-v50257 1 1 128 50257
+    run_case "$side" "$tree" "$dtype" n4096-v32768 2 4 512 32768
+    run_case "$side" "$tree" "$dtype" n4096-v50257 2 4 512 50257
+    run_case "$side" "$tree" "$dtype" n4096-v131072 2 4 512 131072
     run_case "$side" "$tree" "$dtype" b32-t256-v32768 4 8 256 32768
   done
 done
