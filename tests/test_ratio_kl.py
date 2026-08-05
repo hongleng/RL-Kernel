@@ -102,6 +102,7 @@ def _kernel_case(
     if masked_oob:
         action = action.clone()
         action[~mask] = vocab + 999
+    mask = mask.to(torch.int32)
     old = torch.randn(n_rows, device="cuda", dtype=torch.float32)
     ratio, kl, diff, logz = (
         torch.empty(n_rows, device="cuda", dtype=torch.float32) for _ in range(4)
@@ -160,6 +161,8 @@ def _backward_kernel_output(case, *, write_inactive_zero):
         if write_inactive_zero
         else torch.zeros_like(policy, dtype=torch.float32)
     )
+    if write_inactive_zero:
+        output.fill_(torch.nan)
     _ratio_kl_bwd_kernel[(n_rows,)](
         policy,
         action,
@@ -236,6 +239,19 @@ def test_triton_direct_backward_matches_staging_bitwise(dtype):
 
 
 @requires_nvidia_triton
+def test_triton_fp32_backward_matches_staging_bitwise():
+    case = _kernel_case(torch.float32, vocab=64)
+    staged = _backward_kernel_output(case, write_inactive_zero=False)
+    policy, ref, action, mask, old, *_, grad_ratio, grad_kl, _ = case
+    production_policy = policy.clone().requires_grad_(True)
+
+    ratio, kl = TritonRatioKLOp()(production_policy, ref, action, mask, old)
+    torch.autograd.backward((ratio, kl), (grad_ratio, grad_kl))
+
+    assert torch.equal(production_policy.grad, staged)
+
+
+@requires_nvidia_triton
 @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16])
 @pytest.mark.parametrize(
     ("n_rows", "vocab", "density", "masked_oob"),
@@ -259,7 +275,7 @@ def test_triton_direct_backward_edge_matrix(dtype, n_rows, vocab, density, maske
     staged = _backward_kernel_output(case, write_inactive_zero=False)
     direct = _backward_kernel_output(case, write_inactive_zero=True)
     _, _, _, mask, *_ = case
-    inactive = ~mask
+    inactive = ~mask.bool()
 
     assert torch.equal(direct, staged)
     assert torch.count_nonzero(direct[inactive]) == 0
@@ -372,17 +388,19 @@ def test_triton_backward_selects_direct_or_staging_path(dtype, uses_staging, mon
     policy, ref, action, mask, old = _inputs(seed=12, device="cuda", dtype=dtype)
     policy = policy.requires_grad_(True)
     real_zeros_like = torch.zeros_like
-    staging_dtypes = []
+    staging_shape = (policy.numel() // policy.shape[-1], policy.shape[-1])
+    staging_allocations = []
 
     def track_zeros_like(tensor, *args, **kwargs):
-        staging_dtypes.append(kwargs.get("dtype"))
+        if tensor.shape == staging_shape and kwargs.get("dtype") == torch.float32:
+            staging_allocations.append(tensor.shape)
         return real_zeros_like(tensor, *args, **kwargs)
 
     monkeypatch.setattr(ratio_kl_module.torch, "zeros_like", track_zeros_like)
     ratio, kl = TritonRatioKLOp()(policy, ref, action, mask, old)
     (ratio.sum() + kl.sum()).backward()
 
-    assert staging_dtypes == ([torch.float32] if uses_staging else [])
+    assert len(staging_allocations) == int(uses_staging)
 
 
 @requires_nvidia_triton

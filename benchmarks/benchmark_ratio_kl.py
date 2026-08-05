@@ -172,30 +172,34 @@ def _backward_row(config: BenchmarkConfig) -> dict[str, Any]:
     grad_kl = torch.randn(*shape[:-1], 2, device=config.device)[:, :, 0]
     op = TritonRatioKLOp()
 
-    isolated_policy = policy.detach().requires_grad_(True)
-    ratio, kl = op(
-        isolated_policy,
-        ref,
-        batch.token_ids,
-        batch.completion_mask,
-        batch.old_logps,
-    )
-
-    def isolated_backward():
-        isolated_policy.grad = None
-        torch.autograd.backward(
-            (ratio, kl), (grad_ratio, grad_kl), retain_graph=True
+    def measure_isolated_backward():
+        isolated_policy = policy.detach().requires_grad_(True)
+        ratio, kl = op(
+            isolated_policy,
+            ref,
+            batch.token_ids,
+            batch.completion_mask,
+            batch.old_logps,
         )
-        return isolated_policy.grad
 
-    _, isolated_samples = _time_samples_ms(
-        isolated_backward,
-        config.device,
-        warmup=config.warmup,
-        repeat=config.repeat,
-    )
-    isolated_policy.grad = None
-    isolated_peak = _incremental_peak_bytes(isolated_backward, config.device)
+        def isolated_backward():
+            isolated_policy.grad = None
+            torch.autograd.backward((ratio, kl), (grad_ratio, grad_kl), retain_graph=True)
+            return isolated_policy.grad
+
+        last_grad, samples = _time_samples_ms(
+            isolated_backward,
+            config.device,
+            warmup=config.warmup,
+            repeat=config.repeat,
+        )
+        isolated_policy.grad = None
+        del last_grad
+        peak = _incremental_peak_bytes(isolated_backward, config.device)
+        isolated_policy.grad = None
+        return samples, peak
+
+    isolated_samples, isolated_peak = measure_isolated_backward()
 
     torch.cuda.empty_cache()
 
@@ -208,9 +212,7 @@ def _backward_row(config: BenchmarkConfig) -> dict[str, Any]:
             batch.completion_mask,
             batch.old_logps,
         )
-        torch.autograd.backward(
-            (current_ratio, current_kl), (grad_ratio, grad_kl)
-        )
+        torch.autograd.backward((current_ratio, current_kl), (grad_ratio, grad_kl))
         return current_policy.grad
 
     _, forward_backward_samples = _time_samples_ms(
@@ -220,6 +222,10 @@ def _backward_row(config: BenchmarkConfig) -> dict[str, Any]:
         repeat=config.repeat,
     )
 
+    direct_output = torch.version.hip is None and config.dtype in (
+        torch.float16,
+        torch.bfloat16,
+    )
     return {
         "shape": list(shape),
         "dtype": str(config.dtype),
@@ -230,22 +236,28 @@ def _backward_row(config: BenchmarkConfig) -> dict[str, Any]:
         "forward_backward_ms": forward_backward_samples,
         "forward_backward_median_ms": statistics.median(forward_backward_samples),
         "incremental_peak_bytes": isolated_peak,
-        "expected_direct_output_bytes": policy.numel() * policy.element_size(),
-        "expected_staging_saving_bytes": 4 * policy.numel(),
+        "expected_direct_output_bytes": (
+            policy.numel() * policy.element_size() if direct_output else 0
+        ),
+        "expected_staging_saving_bytes": 4 * policy.numel() if direct_output else 0,
     }
+
+
+def _metadata_value(command: list[str]) -> str:
+    try:
+        return subprocess.check_output(command, text=True).strip()
+    except (subprocess.CalledProcessError, OSError):
+        return "unknown"
 
 
 def _write_backward_results(
     rows: list[dict[str, Any]], config: BenchmarkConfig, output: Path | None
 ) -> Path:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    sha = _metadata_value(["git", "rev-parse", "HEAD"])
     output = output or REPO_ROOT / ".cache/benchmarks/ratio_kl" / f"raw-{sha[:8]}-{stamp}.json"
     output.parent.mkdir(parents=True, exist_ok=True)
-    driver = subprocess.check_output(
-        ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
-        text=True,
-    ).strip()
+    driver = _metadata_value(["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"])
     payload = {
         "metadata": {
             "timestamp_utc": datetime.now(timezone.utc).isoformat(),
