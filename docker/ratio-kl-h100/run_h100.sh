@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_REF=${1:-063a261516febcde700c1b751b60b73b11abb427}
-HEAD_REF=${2:-7cda80c394381805b8967bae596ded4d1343b8d4}
+BASE_REF=${1:-0b12d342e2f03e4ad79deb00d8db19e2d8835f4b}
+HEAD_REF=${2:-fd6fde54b50053434591a521c67ae608128ddeed}
 REPO=$(git rev-parse --show-toplevel)
 OUT="$REPO/.cache/benchmarks/ratio_kl/h100-$(date -u +%Y%m%dT%H%M%SZ)"
 TMP=$(mktemp -d)
@@ -30,7 +30,8 @@ run_case() {
     cd "$tree"
     PYTHONPATH="$tree" python "$TMP/benchmark_ratio_kl.py" \
       --backward-suite --dtype "$dtype" --num-prompts "$prompts" --g-sizes "$groups" \
-      --completion-lens "$tokens" --vocab-sizes "$vocab" --mask-densities 0.1,0.9 \
+      --completion-lens "$tokens" --vocab-sizes "$vocab" \
+      --mask-densities 0.1,0.25,0.5,1.0 \
       --seed 0 --warmup 20 --repeat 100 --output "$OUT/$side/$dtype-$label.json"
   )
 }
@@ -39,9 +40,6 @@ for dtype in float16 bfloat16; do
   for side in base head; do
     tree=$BASE_TREE
     [[ $side == head ]] && tree=$HEAD_TREE
-    run_case "$side" "$tree" "$dtype" n4096-v32768 2 4 512 32768
-    run_case "$side" "$tree" "$dtype" n4096-v50257 2 4 512 50257
-    run_case "$side" "$tree" "$dtype" n4096-v131072 2 4 512 131072
     run_case "$side" "$tree" "$dtype" b32-t256-v32768 4 8 256 32768
   done
 done

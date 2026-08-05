@@ -38,4 +38,4 @@ jobs:
           context: .
           file: docker/ratio-kl-h100/Dockerfile
           push: true
-          tags: ghcr.io/hongleng/rl-kernel-ratio-kl:7cda80c-runtime
+          tags: ghcr.io/hongleng/rl-kernel-ratio-kl:fd6fde5-density-runtime
