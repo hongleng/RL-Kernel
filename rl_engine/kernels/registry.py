@@ -175,6 +175,15 @@ class OpBackend(Enum, metaclass=_KernelEnumMeta):
     ASCEND_SILU = "rl_engine.kernels.ops.ascend.activation.silu.SiLUAscendOp"
     TRITON_SILU = "rl_engine.kernels.ops.triton.activation.swiglu.TritonSiLUOp"
     TRITON_SWIGLU = "rl_engine.kernels.ops.triton.activation.swiglu.TritonSwiGLUOp"
+    PYTORCH_ADALN_MODULATION = (
+        "rl_engine.kernels.ops.pytorch.norm.adaln_modulation.NativeAdaLNModulationOp"
+    )
+    TRITON_ADALN_MODULATION = (
+        "rl_engine.kernels.ops.triton.norm.adaln_modulation.TritonAdaLNModulationOp"
+    )
+    CUDA_ADALN_MODULATION = (
+        "rl_engine.kernels.ops.cuda.norm.adaln_modulation.CudaAdaLNModulationOp"
+    )
 
     # WS1 pure-PyTorch ground-truth attention reference (hand-written fp32 softmax).
     # Distinct from PYTORCH_ATTN above, which is the production SDPA fallback.
@@ -602,6 +611,11 @@ class KernelRegistry:
                     OpBackend.TRITON_SWIGLU,
                     OpBackend.PYTORCH_NATIVE_SWIGLU,
                 ],
+                "adaln_modulation": [
+                    OpBackend.CUDA_ADALN_MODULATION,
+                    OpBackend.TRITON_ADALN_MODULATION,
+                    OpBackend.PYTORCH_ADALN_MODULATION,
+                ],
                 # Default dispatch logic for new operators
                 "matmul": [OpBackend.PYTORCH_NATIVE_MATMUL],
                 "rope": [
@@ -649,6 +663,7 @@ class KernelRegistry:
                 "embedding": [OpBackend.PYTORCH_NATIVE_EMBEDDING],
                 "silu": [OpBackend.TRITON_SILU, OpBackend.PYTORCH_NATIVE_SILU],
                 "swiglu": [OpBackend.TRITON_SWIGLU, OpBackend.PYTORCH_NATIVE_SWIGLU],
+                "adaln_modulation": [OpBackend.PYTORCH_ADALN_MODULATION],
             },
             "musa": {
                 "logp": [OpBackend.TRITON_LOGP, OpBackend.PYTORCH_NATIVE],
@@ -693,6 +708,7 @@ class KernelRegistry:
                 ],
                 "silu": [OpBackend.TRITON_SILU, OpBackend.PYTORCH_NATIVE_SILU],
                 "swiglu": [OpBackend.TRITON_SWIGLU, OpBackend.PYTORCH_NATIVE_SWIGLU],
+                "adaln_modulation": [OpBackend.PYTORCH_ADALN_MODULATION],
             },
             "cpu": {
                 "logp": [OpBackend.PYTORCH_NATIVE],
@@ -718,11 +734,13 @@ class KernelRegistry:
                 "embedding": [OpBackend.PYTORCH_NATIVE_EMBEDDING],
                 "silu": [OpBackend.PYTORCH_NATIVE_SILU],
                 "swiglu": [OpBackend.PYTORCH_NATIVE_SWIGLU],
+                "adaln_modulation": [OpBackend.PYTORCH_ADALN_MODULATION],
             },
             # Ascend NPU: op types without an entry fall back to their CPU
             # candidates (see the runtime override below), so only
             # Ascend-accelerated ops are listed.
             "npu": {
+                "adaln_modulation": [OpBackend.PYTORCH_ADALN_MODULATION],
                 "batch_invariant_logp": [
                     OpBackend.ASCEND_BATCH_INVARIANT_LOGP,
                     OpBackend.PYTORCH_BATCH_INVARIANT_LOGP,
@@ -1042,6 +1060,37 @@ class KernelRegistry:
                 return op_instance
 
         raise RuntimeError(f"No functional backend found for {op_type} on {platform}")
+
+    def get_adaln_modulation_op(
+        self, device: torch.device | str | None = None, *, hidden: int
+    ) -> tuple[Any, dict[str, Any]]:
+        """Resolve AdaLN with a trace that makes backend fallback visible."""
+        if hidden <= 0:
+            raise ValueError("hidden must be positive")
+        platform = self._platform_for_device(device)
+        candidates = self._priority_map[platform]["adaln_modulation"]
+        rejected: list[str] = []
+        for backend in candidates:
+            if backend is OpBackend.CUDA_ADALN_MODULATION and hidden > 4096:
+                rejected.append("CUDA_ADALN_MODULATION: H > 4096")
+                continue
+            op = self._get_or_create_backend(backend)
+            if op is None:
+                rejected.append(backend.name)
+                continue
+            trace = {
+                "selected_backend": backend.name,
+                "fallback": bool(rejected),
+                "rejected_backends": rejected,
+                "reduction_order": "pairwise_lower_upper_H; ascending_logical_token_S",
+                "accumulator_dtype": "fp32",
+                "split_k": False,
+                "stream_k": False,
+                "tf32": False,
+                "kernel_fingerprint": f"adaln_modulation_v1:{backend.name}",
+            }
+            return op, trace
+        raise RuntimeError(f"No functional adaln_modulation backend on {platform}: {rejected}")
 
     def _platform_for_device(self, device: torch.device | str | None) -> str:
         if device is None:
