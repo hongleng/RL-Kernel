@@ -11,7 +11,10 @@ from typing import Any
 import torch
 
 from rl_engine.kernels.gtest.op_checks import CandidateSpec, OperatorCase
-from rl_engine.kernels.gtest.operator_inputs import make_operator_inputs, operator_shape_name
+from rl_engine.kernels.gtest.operator_inputs import (
+    make_operator_inputs,
+    operator_shape_name,
+)
 
 
 @dataclass(frozen=True)
@@ -22,6 +25,8 @@ class OperatorSpec:
     gold_method: str
     candidate_paths: dict[str, str]
     grad_input_names: tuple[str, ...] = ()
+    gold_input_dtype: torch.dtype | None = None
+    output_matches_input_dtype: bool = False
 
 
 def _load_object(path: str) -> Any:
@@ -32,6 +37,22 @@ def _load_object(path: str) -> Any:
 
 
 OP_SPECS = {
+    "adaln_modulation": OperatorSpec(
+        name="adaln_modulation",
+        op_class="reduction",
+        gold_path="rl_engine.kernels.gtest.operator_specs.GtestAdaLNReference",
+        gold_method="forward_fp32",
+        candidate_paths={
+            "pytorch": (
+                "rl_engine.kernels.ops.pytorch.norm.adaln_modulation.NativeAdaLNModulationOp"
+            ),
+            "triton": "rl_engine.kernels.ops.triton.norm.adaln_modulation.TritonAdaLNModulationOp",
+            "cuda": "rl_engine.kernels.ops.cuda.norm.adaln_modulation.CudaAdaLNModulationOp",
+        },
+        grad_input_names=("x", "modulation"),
+        gold_input_dtype=torch.float32,
+        output_matches_input_dtype=True,
+    ),
     "rms_norm": OperatorSpec(
         name="rms_norm",
         op_class="reduction",
@@ -258,6 +279,26 @@ OP_SPECS = {
 }
 
 
+class GtestAdaLNReference:
+    """Independent CPU FP32 LayerNorm/autograd gold, not the fixed-tree kernel.
+
+    Transfers/casts retain autograd edges to the caller's inputs. Outputs stay
+    FP32; no production normalization or custom backward helper is used.
+    """
+
+    def forward_fp32(self, x, modulation, *, eps=1e-6, modulate_index=None):
+        x32 = x.to(device="cpu", dtype=torch.float32)
+        mod32 = modulation.to(device="cpu", dtype=torch.float32)
+        if modulate_index is None:
+            shift, scale, gate = mod32[:, None, :].chunk(3, dim=-1)
+        else:
+            batch = x.shape[0]
+            rows = torch.arange(batch)[:, None] + modulate_index.cpu().long() * batch
+            shift, scale, gate = mod32[rows].chunk(3, dim=-1)
+        norm = torch.nn.functional.layer_norm(x32, (x.shape[-1],), eps=eps)
+        return norm * (1 + scale) + shift, gate
+
+
 class GtestPackOp:
     """gtest view of NativePackOp: compare the packed rows, not cu_seqlens."""
 
@@ -289,7 +330,9 @@ class GtestPrefixSharedAttentionOp:
     op_class = "attention"
 
     def __init__(self) -> None:
-        from rl_engine.kernels.ops.pytorch.attention.standard_attn import NativeAttentionOp
+        from rl_engine.kernels.ops.pytorch.attention.standard_attn import (
+            NativeAttentionOp,
+        )
 
         self._op = NativeAttentionOp()
 
@@ -328,6 +371,8 @@ def make_operator_case(
         inputs=make_operator_inputs(args.op, args, dtype, device),
         gold_fn=gold_fn,
         grad_input_names=spec.grad_input_names,
+        gold_input_dtype=spec.gold_input_dtype,
+        candidate_output_dtype=dtype if spec.output_matches_input_dtype else None,
     )
 
 

@@ -10,8 +10,12 @@ name: WS1-gtest-GPU
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [ main, test-qwenimage ]
     paths:
+      - "csrc/**"
+      - "setup.py"
+      - "tests/test_adaln*.py"
+      - "scripts/check_operator.py"
       - "rl_engine/kernels/gtest/**"
       - "rl_engine/kernels/ops/**"
       - "rl_engine/testing/**"
@@ -28,8 +32,12 @@ on:
       - "ci/run_gpu_ci.sh"
       - ".github/workflows/ws1-gtest-gpu.yml"
   push:
-    branches: [ main ]
+    branches: [ main, test-qwenimage ]
     paths:
+      - "csrc/**"
+      - "setup.py"
+      - "tests/test_adaln*.py"
+      - "scripts/check_operator.py"
       - "rl_engine/kernels/gtest/**"
       - "rl_engine/kernels/ops/**"
       - "rl_engine/testing/**"
