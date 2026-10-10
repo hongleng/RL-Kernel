@@ -10,7 +10,7 @@ name: WS1-gtest-GPU
 
 on:
   pull_request:
-    branches: [ main, test-qwenimage ]
+    branches: [ main ]
     paths:
       - "csrc/**"
       - "setup.py"
@@ -32,7 +32,7 @@ on:
       - "ci/run_gpu_ci.sh"
       - ".github/workflows/ws1-gtest-gpu.yml"
   push:
-    branches: [ main, test-qwenimage ]
+    branches: [ main ]
     paths:
       - "csrc/**"
       - "setup.py"
