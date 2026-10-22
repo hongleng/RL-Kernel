@@ -39,7 +39,8 @@ def main():
         out / "acceptance",
         ignore=shutil.ignore_patterns("__pycache__"),
     )
-    shutil.copy2(assets / "Dockerfile", out / "Dockerfile")
+    for name in ("Dockerfile", "requirements.txt"):
+        shutil.copy2(assets / name, out / name)
     files = {
         p.relative_to(out).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
         for p in sorted(out.rglob("*"))

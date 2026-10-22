@@ -9,7 +9,7 @@
 - 算子比较基线：`16b81175874ecf11d5ff05c00de3b69e9457591b`。
 - infra 分支：`infra/adaln-h100-image`；算子分支不包含镜像配置。
 - CUDA 12.6.3 devel、Python 3.11.17、PyTorch 2.12.1+cu126、Triton 3.7.1。
-- 依赖在镜像构建时解析并执行 pip check；实际版本存于 `/opt/image-packages.txt`。
+- 完整依赖版本固定于 `requirements.txt`（来自首次成功构建39565761133），并执行 pip check；实际版本存于 `/opt/image-packages.txt`。
 - 镜像构建完成后，以 `image-reference.txt` 的完整 `image@sha256:...` 固定整个环境。
 
 用户已选择 CUDA12.6 + Python3.11。CUDA12.4 常规配套的 Triton3.2 不识别源码中的
@@ -33,6 +33,15 @@ Native 构建、真实 GPU 正确性和 sanitizer 在 H100 执行；Actions 成�
 下载 `adaln-h100-image-evidence` artifact：包括完整 digest、构建 metadata、源码清单、
 环境及测试清单和源码/infra/workflow 三个提交身份。使用 digest，不依赖可移动的 tag。
 GHCR package 应设为 public，或在 RunPod 配置只读拉取凭据；不把凭据写进镜像或证据。
+
+## 拉取层优化（2026-10-22）
+
+首次镜像的压缩总大小为7.29GiB，其中Torch/CUDA Python依赖集中在单个3.35GiB层。
+RunPod日志显示该层下载约7分钟后重试。当前Dockerfile将依赖拆成7个安装层，
+Torch和cuDNN各自独立；构建缓存使用BuildKit cache mount，不随镜像发布。
+安装阶段临时使用no-deps，最后按完整固定清单安装并执行pip check，保留原环境版本。
+拆层降低单层重传量；总大小和新层大小以新构建manifest为准，不保证总拉取时间低于10分钟。
+基础CUDA层保持原样，节点已有这些层时可继续复用。
 
 ## 手动 RunPod
 

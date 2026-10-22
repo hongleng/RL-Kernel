@@ -12,12 +12,33 @@ ENV UV_PYTHON_INSTALL_DIR=/opt/python
 RUN uv python install 3.11.17 && uv venv --python 3.11.17 /opt/venv
 ENV PATH=/opt/venv/bin:/usr/local/cuda-12.6/bin:${PATH}
 ENV CC=gcc-11 CXX=g++-11 CUDA_HOME=/usr/local/cuda-12.6
-RUN uv pip install --python /opt/venv/bin/python \
-    --index-url https://pypi.org/simple \
-    --extra-index-url https://download.pytorch.org/whl/cu126 \
-    --index-strategy unsafe-best-match \
-    torch==2.12.1+cu126 triton==3.7.1 pytest==9.1.1 ninja==1.13.2 \
-    setuptools==78.1.0 numpy==2.3.5 packaging==26.3 tabulate==0.9.0 wheel==0.45.1
+COPY requirements.txt /opt/image-requirements.txt
+ENV UV_INDEX_URL=https://pypi.org/simple \
+    UV_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu126 \
+    UV_INDEX_STRATEGY=unsafe-best-match UV_LINK_MODE=copy
+# Separate large packages so a failed pull retries one smaller layer.
+# Cache mounts retain build downloads without shipping the uv cache.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --python /opt/venv/bin/python --no-deps \
+    -c /opt/image-requirements.txt nvidia-cublas-cu12
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --python /opt/venv/bin/python --no-deps \
+    -c /opt/image-requirements.txt nvidia-cudnn-cu12
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --python /opt/venv/bin/python --no-deps \
+    -c /opt/image-requirements.txt nvidia-cufft-cu12 nvidia-curand-cu12 nvidia-cusolver-cu12
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --python /opt/venv/bin/python --no-deps \
+    -c /opt/image-requirements.txt nvidia-cusparse-cu12 nvidia-cusparselt-cu12
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --python /opt/venv/bin/python --no-deps \
+    -c /opt/image-requirements.txt nvidia-nccl-cu12 nvidia-nvshmem-cu12
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --python /opt/venv/bin/python --no-deps \
+    -c /opt/image-requirements.txt torch
+# Resolve and check the complete pinned environment after staged installs.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --python /opt/venv/bin/python -r /opt/image-requirements.txt
 
 WORKDIR /opt/RL-Kernel
 COPY . .

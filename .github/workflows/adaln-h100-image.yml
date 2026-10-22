@@ -67,7 +67,7 @@ jobs:
           printf '%s@%s\n' "$IMAGE" "$IMAGE_DIGEST" | tee image-evidence/image-reference.txt
           printf '%s\n' "$BUILD_METADATA" > image-evidence/build-metadata.json
           cp "$RUNNER_TEMP/adaln-context/acceptance/source-profile.json" image-evidence/
-          cp docker/adaln-h100/Dockerfile docker/adaln-h100/acceptance/{environment,test-manifest}.json image-evidence/
+          cp docker/adaln-h100/{Dockerfile,requirements.txt} docker/adaln-h100/acceptance/{environment,test-manifest}.json image-evidence/
           printf 'Source: 69bd47f72a24d1177580d9b11b6efdfeb6c6bab5\nInfrastructure: %s\nWorkflow: %s\n' "$INFRA_SHA" "$GITHUB_SHA" > image-evidence/commits.txt
           cat image-evidence/image-reference.txt >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
