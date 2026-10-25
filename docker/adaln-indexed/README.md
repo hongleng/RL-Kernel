@@ -26,16 +26,22 @@ gh workflow run adaln-h100-image.yml --repo hongleng/RL-Kernel \
 ```
 
 Actions checks source hashes, HEAD, Python3.11 syntax, pinned environment and pip
-dependencies, runs 159 CPU harness/reference/policy checks, then collects all
+dependencies, runs 158 CPU harness/reference/policy checks plus an extension-free
+Triton-to-CPU fallback self-check, then collects all
 17 suites without GPU execution or extension compilation. Actual node IDs and
 the performance plan must equal the reviewed candidate locks. Failures stop the
 build. No numerical qualification is inferred from image build success.
 
-Four CPU-input policy cases require native extension symbols during resolution:
+Five CPU-input policy cases assume native CUDA selection during resolution:
 `test_explicit_indexed_activation_resolves_without_enabling_cpu_select01` and the
-three `test_activated_strict_rechecks_actual_domain_before_execution` parameters.
+three `test_activated_strict_rechecks_actual_domain_before_execution` parameters,
+plus `test_ordinary_gpu_resolution_rechecks_shared_cpu_device_with_real_fallback`.
 They are explicitly deselected in this extension-free image build, not counted as
 passed. Native activation and domain checks remain target evidence requirements.
+The self-check verifies actual source import, absence of a native binary, real
+Triton selection, CPU fallback reason and forward/backward bytes. Local validation
+must use isolated Python `-S` with explicit site-packages to prevent editable import
+hooks from loading another checkout's native extension.
 
 The artifact `adaln-indexed-image-evidence` contains the published image digest,
 source/infra/workflow commits, CPU JUnit, exact node lists, performance plan,

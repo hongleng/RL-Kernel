@@ -10,7 +10,7 @@ RUN mkdir -p /opt/adaln-indexed-image-checks \
     && python -m pytest .cache/adaln-indexed/test_benchmark_adaln_indexed.py \
        .cache/adaln-indexed/test_ticket0607.py tests/reference/test_adaln_indexed.py \
        tests/runtime/test_adaln_strict_policy.py -q \
-       -k 'not explicit_indexed_activation_resolves_without_enabling_cpu_select01 and not activated_strict_rechecks_actual_domain_before_execution' \
+       -k 'not explicit_indexed_activation_resolves_without_enabling_cpu_select01 and not activated_strict_rechecks_actual_domain_before_execution and not ordinary_gpu_resolution_rechecks_shared_cpu_device_with_real_fallback' \
        --junitxml=/opt/adaln-indexed-image-checks/cpu.xml \
     && python .cache/adaln-indexed/run_ticket0607.py --prepare \
        --output /opt/adaln-indexed-image-checks/candidate \
