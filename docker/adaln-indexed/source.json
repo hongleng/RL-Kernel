@@ -1,0 +1,4 @@
+{
+  "source_sha": "5490223a850fe9cb1efd5c3cceeb0fb964ee5c1c",
+  "base_image": "ghcr.io/hongleng/rl-kernel/adaln-h100@sha256:682fae9afbb852c75c7b519e9b80645e6528c0d8d034d29ed4bd35f0a5073ce4"
+}

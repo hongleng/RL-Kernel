@@ -1,4 +1,4 @@
-name: Build AdaLN H100 acceptance image
+name: Build indexed AdaLN acceptance image
 
 on:
   workflow_dispatch:
@@ -6,14 +6,14 @@ on:
       infrastructure_ref:
         description: Image preparation branch or commit
         required: true
-        default: infra/adaln-h100-image
+        default: infra/adaln-indexed-image
 
 permissions:
   contents: read
   packages: write
 
 concurrency:
-  group: adaln-h100-image
+  group: adaln-indexed-image
   cancel-in-progress: false
 
 jobs:
@@ -31,10 +31,11 @@ jobs:
           python-version: '3.11.17'
       - name: Prepare fixed source and runners
         run: |
-          SOURCE_SHA=69bd47f72a24d1177580d9b11b6efdfeb6c6bab5
+          SOURCE_SHA=$(python3 -c 'import json; print(json.load(open("docker/adaln-indexed/source.json"))["source_sha"])')
+          echo "SOURCE_SHA=$SOURCE_SHA" >> "$GITHUB_ENV"
           git fetch --no-tags --depth=1 origin "$SOURCE_SHA"
-          python3 docker/adaln-h100/prepare_context.py --out "$RUNNER_TEMP/adaln-context"
-          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}/adaln-h100" >> "$GITHUB_ENV"
+          python3 docker/adaln-indexed/prepare_context.py --out "$RUNNER_TEMP/adaln-context"
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}/adaln-indexed" >> "$GITHUB_ENV"
           echo "INFRA_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
       - name: Free runner disk
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
@@ -50,28 +51,35 @@ jobs:
         with:
           context: ${{ runner.temp }}/adaln-context
           file: ${{ runner.temp }}/adaln-context/Dockerfile
+          target: runtime
           push: true
           platforms: linux/amd64
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ env.INFRA_SHA }}
-          tags: ${{ env.IMAGE }}:source-69bd47f-${{ env.INFRA_SHA }}
-          cache-from: type=gha,scope=adaln-h100
-          cache-to: type=gha,mode=max,scope=adaln-h100
+          tags: ${{ env.IMAGE }}:source-${{ env.SOURCE_SHA }}-${{ env.INFRA_SHA }}
+          cache-from: type=gha,scope=adaln-indexed
+          cache-to: type=gha,mode=max,scope=adaln-indexed
+      - name: Export CPU and collection evidence from the cached image build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ runner.temp }}/adaln-context
+          file: ${{ runner.temp }}/adaln-context/Dockerfile
+          target: evidence
+          platforms: linux/amd64
+          outputs: type=local,dest=${{ runner.temp }}/indexed-image-evidence
       - name: Save image identity
         env:
           IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
           BUILD_METADATA: ${{ steps.build.outputs.metadata }}
         run: |
-          mkdir -p image-evidence
+          cp -a "$RUNNER_TEMP/indexed-image-evidence" image-evidence
           printf '%s@%s\n' "$IMAGE" "$IMAGE_DIGEST" | tee image-evidence/image-reference.txt
           printf '%s\n' "$BUILD_METADATA" > image-evidence/build-metadata.json
-          cp "$RUNNER_TEMP/adaln-context/acceptance/source-profile.json" image-evidence/
-          cp docker/adaln-h100/{Dockerfile,requirements.txt} docker/adaln-h100/acceptance/{environment,test-manifest}.json image-evidence/
-          printf 'Source: 69bd47f72a24d1177580d9b11b6efdfeb6c6bab5\nInfrastructure: %s\nWorkflow: %s\n' "$INFRA_SHA" "$GITHUB_SHA" > image-evidence/commits.txt
+          printf 'Source: %s\nInfrastructure: %s\nWorkflow: %s\n' "$SOURCE_SHA" "$INFRA_SHA" "$GITHUB_SHA" > image-evidence/commits.txt
           cat image-evidence/image-reference.txt >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
-          name: adaln-h100-image-evidence
+          name: adaln-indexed-image-evidence
           path: image-evidence/
           if-no-files-found: error

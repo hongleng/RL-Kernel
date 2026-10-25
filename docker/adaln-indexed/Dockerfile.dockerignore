@@ -1,0 +1,11 @@
+# Override the operator checkout's .dockerignore, which excludes required .git identity.
+.venv
+**/__pycache__
+.pytest_cache
+.mypy_cache
+.ruff_cache
+build
+dist
+site
+artifacts
+runs

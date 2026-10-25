@@ -1,0 +1,834 @@
+{
+  "schema": "adaln-indexed-benchmark-v1",
+  "state": "COMMAND_PREPARED",
+  "backends": [
+    "cuda",
+    "triton",
+    "framework-select01"
+  ],
+  "modes": [
+    "forward",
+    "backward-only",
+    "forward+backward"
+  ],
+  "cases": [
+    {
+      "shape": [
+        2,
+        8,
+        2
+      ],
+      "dtype": "fp32",
+      "route": "all0",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        2,
+        8,
+        2
+      ],
+      "dtype": "fp32",
+      "route": "all0",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        2,
+        8,
+        2
+      ],
+      "dtype": "fp32",
+      "route": "all1",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        2,
+        8,
+        2
+      ],
+      "dtype": "fp32",
+      "route": "all1",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        2,
+        8,
+        2
+      ],
+      "dtype": "fp32",
+      "route": "alternating",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        2,
+        8,
+        2
+      ],
+      "dtype": "fp32",
+      "route": "alternating",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        2,
+        8,
+        2
+      ],
+      "dtype": "fp32",
+      "route": "random",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        2,
+        8,
+        2
+      ],
+      "dtype": "fp32",
+      "route": "random",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        2,
+        8,
+        2
+      ],
+      "dtype": "fp32",
+      "route": "segmented",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        2,
+        8,
+        2
+      ],
+      "dtype": "fp32",
+      "route": "segmented",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        2,
+        8,
+        2
+      ],
+      "dtype": "bf16",
+      "route": "all0",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        2,
+        8,
+        2
+      ],
+      "dtype": "bf16",
+      "route": "all0",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        2,
+        8,
+        2
+      ],
+      "dtype": "bf16",
+      "route": "all1",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        2,
+        8,
+        2
+      ],
+      "dtype": "bf16",
+      "route": "all1",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        2,
+        8,
+        2
+      ],
+      "dtype": "bf16",
+      "route": "alternating",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        2,
+        8,
+        2
+      ],
+      "dtype": "bf16",
+      "route": "alternating",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        2,
+        8,
+        2
+      ],
+      "dtype": "bf16",
+      "route": "random",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        2,
+        8,
+        2
+      ],
+      "dtype": "bf16",
+      "route": "random",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        2,
+        8,
+        2
+      ],
+      "dtype": "bf16",
+      "route": "segmented",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        2,
+        8,
+        2
+      ],
+      "dtype": "bf16",
+      "route": "segmented",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        4096,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "all0",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        4096,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "all0",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        4096,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "all1",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        4096,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "all1",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        4096,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "alternating",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        4096,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "alternating",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        4096,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "random",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        4096,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "random",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        4096,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "segmented",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        4096,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "segmented",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        4096,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "all0",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        4096,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "all0",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        4096,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "all1",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        4096,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "all1",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        4096,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "alternating",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        4096,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "alternating",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        4096,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "random",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        4096,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "random",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        4096,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "segmented",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        4096,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "segmented",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        6889,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "all0",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        6889,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "all0",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        6889,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "all1",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        6889,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "all1",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        6889,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "alternating",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        6889,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "alternating",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        6889,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "random",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        6889,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "random",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        6889,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "segmented",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        6889,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "segmented",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        6889,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "all0",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        6889,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "all0",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        6889,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "all1",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        6889,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "all1",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        6889,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "alternating",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        6889,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "alternating",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        6889,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "random",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        6889,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "random",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        6889,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "segmented",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        6889,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "segmented",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        6032,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "all0",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        6032,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "all0",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        6032,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "all1",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        6032,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "all1",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        6032,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "alternating",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        6032,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "alternating",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        6032,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "random",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        6032,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "random",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        6032,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "segmented",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        6032,
+        3072
+      ],
+      "dtype": "fp32",
+      "route": "segmented",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        6032,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "all0",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        6032,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "all0",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        6032,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "all1",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        6032,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "all1",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        6032,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "alternating",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        6032,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "alternating",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        6032,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "random",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        6032,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "random",
+      "layout": "strided"
+    },
+    {
+      "shape": [
+        3,
+        6032,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "segmented",
+      "layout": "contiguous"
+    },
+    {
+      "shape": [
+        3,
+        6032,
+        3072
+      ],
+      "dtype": "bf16",
+      "route": "segmented",
+      "layout": "strided"
+    }
+  ],
+  "warmup": 5,
+  "repeat": 30,
+  "seed": 386,
+  "session": 0,
+  "surfaces": [
+    "public-backend-production",
+    "dispatch-production"
+  ],
+  "warm_kernel": "NOT PROVIDED: no public preallocated kernel API",
+  "timing": "synchronized host wall primary; CUDA event auxiliary, validation included",
+  "forward": "grad enabled; graph creation included, graph destruction after interval",
+  "backward-only": "fresh graph prepared and synchronized outside interval per sample",
+  "allocation": "inputs/index/random dy/dgate preallocated; outputs, gradients, copies, temporaries allocated inside public production calls; autograd.grad, no .grad",
+  "order": "six backend permutations; session/case offsets; raw order retained",
+  "cold": "first candidate validation forward/backward wall; JIT/cache lookup included; cache initially empty per process; reused specializations explicitly possible",
+  "memory": "allocated/reserved peaks, baseline and allocated peak-minus-baseline; not a direct scratch-only measurement",
+  "qualification": "NOT OPENED",
+  "performance_conclusion": "NONE UNTIL TARGET EXECUTION/REVIEW"
+}
