@@ -37,6 +37,10 @@ jobs:
           python3 docker/adaln-indexed/prepare_context.py --out "$RUNNER_TEMP/adaln-context"
           echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}/adaln-indexed" >> "$GITHUB_ENV"
           echo "INFRA_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Check context syntax and CPU-only recovery entry
+        run: |
+          python3 -m py_compile "$RUNNER_TEMP/adaln-context/.cache/adaln-indexed/"*.py
+          python3 "$RUNNER_TEMP/adaln-context/.cache/adaln-indexed/evidence_io.py" --help
       - name: Free runner disk
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
       - uses: docker/setup-buildx-action@v3

@@ -1,3 +1,5 @@
+> 2026-10-27：本 PR 新批次默认范围与运行/恢复/回收入口见 [acceptance-pr-v2.md](acceptance-pr-v2.md)。以下保留为旧计划/历史记录，不能用 v2 回填旧计划 PASS。
+
 # Indexed AdaLN tickets 06/07: user-run target batch
 
 当前状态（2026-10-24，Asia/Shanghai）：07 benchmark 实现及 CPU 检查已准备；

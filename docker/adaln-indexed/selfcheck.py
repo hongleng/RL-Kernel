@@ -81,7 +81,12 @@ def main():
             assert json.loads((candidate / actual).read_text()) == json.loads(
                 (root / "image-acceptance" / locked).read_text()
             ), actual
-        assert json.loads((candidate / "candidate.json").read_text())["state"] == "COMMAND_PREPARED"
+        locked = json.loads((candidate / "candidate.json").read_text())
+        assert locked["state"] == "COMMAND_PREPARED"
+        assert locked["profile"] == "pr-v2" and locked["sessions"] == 1
+        plan = json.loads((candidate / "performance-plan.json").read_text())
+        assert len(plan["cases"]) == 18 and plan["repeat"] == 12 and plan["warmup"] == 3
+        assert plan["surface_modes"]["dispatch-production"] == ["forward+backward"]
         print("All 17 suite node lists and benchmark plan match the locked candidate")
     print("Pinned environment PASS; GPU qualification remains closed")
 

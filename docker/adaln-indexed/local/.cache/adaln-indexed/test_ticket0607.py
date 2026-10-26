@@ -41,10 +41,11 @@ def test_result_parser_rejects_incomplete_or_mismatched_evidence(tmp_path, inval
         "reports.json": [
             {
                 "node": "public-node",
-                "phase": "call",
+                "phase": phase,
                 "outcome": "passed",
                 "xfail": False,
             }
+            for phase in ("setup", "call", "teardown")
         ],
         "source-sha256.json": {"source.py": "same"},
     }

@@ -5,6 +5,8 @@
 import argparse
 import contextlib
 import json
+import hashlib
+import platform
 import math
 import os
 from pathlib import Path
@@ -104,11 +106,17 @@ def parse_args(argv=None):
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--plan", action="store_true")
     parser.add_argument("--diagnostic-only", action="store_true")
-    parser.add_argument("--warmup", type=int, default=5)
-    parser.add_argument("--repeat", type=int, default=30)
+    parser.add_argument("--profile", choices=("pr-v2",), default="pr-v2")
+    parser.add_argument("--oracle-cache", type=Path)
+    parser.add_argument("--warmup", type=int)
+    parser.add_argument("--repeat", type=int)
     parser.add_argument("--session", type=int, default=0)
     parser.add_argument("--seed", type=int, default=386)
     args = parser.parse_args(argv)
+    if args.warmup is None:
+        args.warmup = 3
+    if args.repeat is None:
+        args.repeat = 12
     if args.warmup < 0 or args.repeat < 1 or args.session < 0:
         parser.error("warmup/session nonnegative; repeat positive")
     return args
@@ -118,7 +126,7 @@ def plan(args):
     sizes = [(2, 8, 2)]
     if not args.diagnostic_only:
         sizes += [(3, s, 3072) for s in (4096, 6889, 6032)]
-    return {
+    result = {
         "schema": "adaln-indexed-benchmark-v1",
         "state": "COMMAND_PREPARED",
         "backends": list(BACKENDS),
@@ -153,6 +161,116 @@ def plan(args):
         },
         "performance_conclusion": "NONE UNTIL TARGET EXECUTION/REVIEW",
     }
+
+    result["schema"] = "adaln-indexed-benchmark-pr-v2"
+    result["cases"] = [
+        c
+        for c in result["cases"]
+        if (
+            (c["shape"] == [2, 8, 2] and c["route"] == "alternating")
+            or (
+                c["shape"] != [2, 8, 2]
+                and c["layout"] == "contiguous"
+                and c["route"] in ("segmented", "random")
+            )
+            or (
+                c["shape"] == [3, 6889, 3072]
+                and c["route"] == "random"
+                and c["layout"] == "strided"
+            )
+        )
+    ]
+    result["surface_modes"] = {
+        "public-backend-production": list(MODES),
+        "dispatch-production": ["forward+backward"],
+    }
+    result["scope"] = (
+        "selected production latency/memory and within-process dispersion; "
+        "no inter-process stability"
+    )
+    return result
+
+
+def surface_modes(report):
+    return report.get("surface_modes", {s: report["modes"] for s in report["surfaces"]})
+
+
+def copy_inputs(values, *, device="cpu", layout="contiguous"):
+    result = []
+    for i, tensor in enumerate(values):
+        value = tensor.detach().to(device=device).contiguous()
+        if layout == "strided":
+            value = torch.stack((value, torch.zeros_like(value)), -1)[..., 0]
+        value = value.detach().requires_grad_(i in (0, 1))
+        assert value.is_leaf and (value.is_contiguous() == (layout == "contiguous"))
+        result.append(value)
+    return tuple(result)
+
+
+def oracle_identity(case, seed):
+    # Layout changes storage only; both layouts execute and validate independently.
+    sources = [Path(__file__), ROOT / "tests/helpers/adaln_indexed.py"]
+    sources += sorted((ROOT / "rl_engine/reference").rglob("*.py"))
+    sources += sorted((ROOT / "rl_engine/validation/operators").rglob("*.py"))
+    return dict(
+        case={k: v for k, v in case.items() if k != "layout"},
+        seed=seed,
+        eps=7.0,
+        torch=torch.__version__,
+        python=platform.python_version(),
+        host=platform.node(),
+        machine=platform.machine(),
+        libc=list(platform.libc_ver()),
+        torch_config=torch.__config__.show(),
+        default_dtype=str(torch.get_default_dtype()),
+        threads=torch.get_num_threads(),
+        deterministic=torch.are_deterministic_algorithms_enabled(),
+        sources={str(p.relative_to(ROOT)): _sha256(p) for p in sources},
+    )
+
+
+def cached_references(case, seed, cache):
+    identity = oracle_identity(case, seed)
+    key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+    directory = cache / key
+    meta = directory / "identity.json"
+    payload = directory / "oracle.pt"
+    if directory.exists() and not meta.exists():
+        attempt = 0
+        while directory.with_name(directory.name + f".incomplete-{attempt}").exists():
+            attempt += 1
+        directory.rename(directory.with_name(directory.name + f".incomplete-{attempt}"))
+    if directory.exists():
+        record = json.loads(meta.read_text())
+        if record["identity"] != identity or _sha256(payload) != record["sha256"]:
+            raise RuntimeError("oracle cache identity/hash mismatch")
+        data = torch.load(payload, map_location="cpu", weights_only=True)
+        reused = True
+    else:
+        directory.mkdir(parents=True)
+        dtype = torch.float32 if case["dtype"] == "fp32" else torch.bfloat16
+        inputs = make_inputs(tuple(case["shape"]), dtype, case["route"], seed=seed)
+        fixed, gold = reference_outputs(inputs)
+        data = dict(
+            inputs=tuple(t.detach() for t in inputs),
+            fixed=tuple(t.detach() for t in fixed),
+            gold=tuple(t.detach() for t in gold),
+            baseline=baseline_reference_outputs(inputs),
+        )
+        torch.save(data, payload)
+        temporary = meta.with_suffix(".json.tmp")
+        temporary.write_text(
+            json.dumps(dict(identity=identity, sha256=_sha256(payload)), indent=2) + "\n"
+        )
+        temporary.replace(meta)
+        reused = False
+    inputs = copy_inputs(data["inputs"], layout=case["layout"])
+    return (
+        inputs,
+        (data["fixed"], data["gold"]),
+        (data["fixed"], data["baseline"]),
+        dict(key=key, sha256=_sha256(payload), reused=reused, path=str(directory)),
+    )
 
 
 def backend_order(round_index):
@@ -275,12 +393,18 @@ def assert_backend(op, backend):
     )
 
 
-def sample_call(op, inputs, mode):
+def prepare_events():
+    events = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+    for event in events:
+        event.record()
+    torch.cuda.synchronize()
+    return events
+
+
+def sample_call(op, inputs, mode, events):
     call = prepare_call(op, inputs, mode)
-    start, end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
-    # CUDA events initialize lazily; allocate both before the measured interval.
-    start.record()
-    end.record()
+    start, end = events
+    # Backward-only forward preparation remains outside the interval.
     torch.cuda.synchronize()
     before = torch.cuda.memory_allocated()
     reserved_before = torch.cuda.memory_reserved()
@@ -377,29 +501,20 @@ def main(argv=None):
         if not torch.cuda.is_available() or torch.version.hip is not None:
             raise RuntimeError("NVIDIA CUDA required; no performance result produced")
         report["environment"] = environment()
+        events = None
         with (
             contextlib.redirect_stdout(sys.stderr),
             (out / "samples.jsonl").open("x") as raw,
         ):
             for case_index, case in enumerate(report["cases"]):
-                dtype = torch.float32 if case["dtype"] == "fp32" else torch.bfloat16
-                cpu = make_inputs(
-                    tuple(case["shape"]),
-                    dtype,
-                    case["route"],
-                    seed=args.seed,
-                    layout=case["layout"],
+                print("ORACLE", case_index + 1, "/", len(report["cases"]), case, flush=True)
+                preparation = time.perf_counter()
+                cpu, references, baseline_references, oracle = cached_references(
+                    case, args.seed, args.oracle_cache or out / "oracles"
                 )
-                references = reference_outputs(cpu)
-                baseline_references = (references[0], baseline_reference_outputs(cpu))
-                data = make_inputs(
-                    tuple(case["shape"]),
-                    dtype,
-                    case["route"],
-                    seed=args.seed,
-                    device="cuda",
-                    layout=case["layout"],
-                )
+                oracle["preparation_seconds"] = time.perf_counter() - preparation
+                report.setdefault("oracles", []).append(dict(case=case, **oracle))
+                data = copy_inputs(cpu, device="cuda", layout=case["layout"])
                 direct, dispatch = explicit_backends(case["shape"][-1])
                 for backend in backend_order(args.session + case_index):
                     first = dict(
@@ -439,16 +554,18 @@ def main(argv=None):
                         )
                     )
                 del references, baseline_references, cpu
+                if events is None:
+                    events = prepare_events()
                 for surface, ops in (
                     ("public-backend-production", direct),
                     ("dispatch-production", dispatch),
                 ):
-                    for mode in MODES:
+                    for mode in surface_modes(report)[surface]:
                         records: dict[str, list[dict]] = {b: [] for b in BACKENDS}
                         for iteration in range(args.warmup + args.repeat):
                             order = backend_order(args.session + case_index + iteration)
                             for backend in order:
-                                measured = sample_call(ops[backend], data, mode)
+                                measured = sample_call(ops[backend], data, mode, events)
                                 if surface == "dispatch-production":
                                     assert_backend(ops[backend], backend)
                                 if iteration >= args.warmup:
@@ -483,6 +600,19 @@ def main(argv=None):
                                 )
                             )
                 del data, direct, dispatch
+                checkpoint = out / "checkpoint.json"
+                checkpoint.write_text(
+                    json.dumps(
+                        dict(
+                            completed_cases=case_index + 1,
+                            total_cases=len(report["cases"]),
+                            raw_samples=sum(len(r["samples_ms"]) for r in report["results"]),
+                        )
+                    )
+                    + "\n"
+                )
+                (out / "report.json").write_text(json.dumps(report, indent=2) + "\n")
+                print("CASE COMPLETE", case_index + 1, "/", len(report["cases"]), flush=True)
         report["state"] = "EXECUTION_COMPLETE_REVIEW_PENDING"
     except (Exception, KeyboardInterrupt) as exc:
         import traceback
@@ -501,8 +631,8 @@ def main(argv=None):
 
 def summarize_sessions(reports):
     """Compare session medians only within the identical source/binary/target."""
-    if len(reports) < 2 or len({r["session"] for r in reports}) != len(reports):
-        raise ValueError("at least two distinct sessions required")
+    if not reports or len({r["session"] for r in reports}) != len(reports):
+        raise ValueError("distinct sessions required")
     identity_keys = (
         "gpu",
         "capability",
@@ -521,7 +651,7 @@ def summarize_sessions(reports):
     if any(identity != identities[0] for identity in identities):
         raise ValueError("session source/binary/environment mismatch")
     plan_keys = ("seed", "warmup", "repeat", "cases", "modes", "surfaces", "backends")
-    plans = [{k: r[k] for k in plan_keys} for r in reports]
+    plans = [dict({k: r[k] for k in plan_keys}, surface_modes=surface_modes(r)) for r in reports]
     if any(p != plans[0] for p in plans):
         raise ValueError("session input/sampling plan mismatch")
     grouped = []
@@ -552,7 +682,11 @@ def summarize_sessions(reports):
             )
             for key in sorted(expected)
         ],
-        conclusion="No preset speedup threshold; negative/unstable results are valid",
+        conclusion=(
+            "Within-process only; no inter-process stability conclusion"
+            if len(reports) == 1
+            else "No preset speedup threshold; negative/unstable results are valid"
+        ),
     )
 
 

@@ -126,3 +126,11 @@ production/direct-dispatch 计时；不得标成原07全部性能要求完成。
 最新候选 `artifacts/adaln-0607-candidate-local-v4/`，本地检查与身份记录
 `artifacts/adaln-0607-local-v4-check/`；旧包/历史结果保留，不能替代当前身份。
 独立 warm kernel-only timing、目标运行与资格激活仍待完成。
+
+## 2026-10-27 新批次范围修订
+
+本 PR 新批次使用 [acceptance-pr-v2](../acceptance-pr-v2.md)：correctness/资源边界/
+四 sanitizer 全部原节点不变；性能改为 18 case、216 cells、3 warmup/12 repeats、
+单个独立进程，只支持逐 case production latency/memory 与进程内离散度。
+原三 session/全交叉是历史计划，未完成部分不能由 v2 冒充；kernel-only 仍未提供。
+本地基础设施变更/CPU PASS 不代表目标 GPU 执行、证据接受、资格激活或性能结论。

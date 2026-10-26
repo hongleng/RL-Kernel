@@ -1,5 +1,5 @@
 {
-  "schema": "adaln-indexed-benchmark-v1",
+  "schema": "adaln-indexed-benchmark-pr-v2",
   "state": "COMMAND_PREPARED",
   "backends": [
     "cuda",
@@ -19,46 +19,6 @@
         2
       ],
       "dtype": "fp32",
-      "route": "all0",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        2,
-        8,
-        2
-      ],
-      "dtype": "fp32",
-      "route": "all0",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        2,
-        8,
-        2
-      ],
-      "dtype": "fp32",
-      "route": "all1",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        2,
-        8,
-        2
-      ],
-      "dtype": "fp32",
-      "route": "all1",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        2,
-        8,
-        2
-      ],
-      "dtype": "fp32",
       "route": "alternating",
       "layout": "contiguous"
     },
@@ -78,86 +38,6 @@
         8,
         2
       ],
-      "dtype": "fp32",
-      "route": "random",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        2,
-        8,
-        2
-      ],
-      "dtype": "fp32",
-      "route": "random",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        2,
-        8,
-        2
-      ],
-      "dtype": "fp32",
-      "route": "segmented",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        2,
-        8,
-        2
-      ],
-      "dtype": "fp32",
-      "route": "segmented",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        2,
-        8,
-        2
-      ],
-      "dtype": "bf16",
-      "route": "all0",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        2,
-        8,
-        2
-      ],
-      "dtype": "bf16",
-      "route": "all0",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        2,
-        8,
-        2
-      ],
-      "dtype": "bf16",
-      "route": "all1",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        2,
-        8,
-        2
-      ],
-      "dtype": "bf16",
-      "route": "all1",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        2,
-        8,
-        2
-      ],
       "dtype": "bf16",
       "route": "alternating",
       "layout": "contiguous"
@@ -169,106 +49,6 @@
         2
       ],
       "dtype": "bf16",
-      "route": "alternating",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        2,
-        8,
-        2
-      ],
-      "dtype": "bf16",
-      "route": "random",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        2,
-        8,
-        2
-      ],
-      "dtype": "bf16",
-      "route": "random",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        2,
-        8,
-        2
-      ],
-      "dtype": "bf16",
-      "route": "segmented",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        2,
-        8,
-        2
-      ],
-      "dtype": "bf16",
-      "route": "segmented",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        4096,
-        3072
-      ],
-      "dtype": "fp32",
-      "route": "all0",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        4096,
-        3072
-      ],
-      "dtype": "fp32",
-      "route": "all0",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        4096,
-        3072
-      ],
-      "dtype": "fp32",
-      "route": "all1",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        4096,
-        3072
-      ],
-      "dtype": "fp32",
-      "route": "all1",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        4096,
-        3072
-      ],
-      "dtype": "fp32",
-      "route": "alternating",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        4096,
-        3072
-      ],
-      "dtype": "fp32",
       "route": "alternating",
       "layout": "strided"
     },
@@ -289,88 +69,8 @@
         3072
       ],
       "dtype": "fp32",
-      "route": "random",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        4096,
-        3072
-      ],
-      "dtype": "fp32",
       "route": "segmented",
       "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        4096,
-        3072
-      ],
-      "dtype": "fp32",
-      "route": "segmented",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        4096,
-        3072
-      ],
-      "dtype": "bf16",
-      "route": "all0",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        4096,
-        3072
-      ],
-      "dtype": "bf16",
-      "route": "all0",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        4096,
-        3072
-      ],
-      "dtype": "bf16",
-      "route": "all1",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        4096,
-        3072
-      ],
-      "dtype": "bf16",
-      "route": "all1",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        4096,
-        3072
-      ],
-      "dtype": "bf16",
-      "route": "alternating",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        4096,
-        3072
-      ],
-      "dtype": "bf16",
-      "route": "alternating",
-      "layout": "strided"
     },
     {
       "shape": [
@@ -389,88 +89,8 @@
         3072
       ],
       "dtype": "bf16",
-      "route": "random",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        4096,
-        3072
-      ],
-      "dtype": "bf16",
       "route": "segmented",
       "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        4096,
-        3072
-      ],
-      "dtype": "bf16",
-      "route": "segmented",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        6889,
-        3072
-      ],
-      "dtype": "fp32",
-      "route": "all0",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        6889,
-        3072
-      ],
-      "dtype": "fp32",
-      "route": "all0",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        6889,
-        3072
-      ],
-      "dtype": "fp32",
-      "route": "all1",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        6889,
-        3072
-      ],
-      "dtype": "fp32",
-      "route": "all1",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        6889,
-        3072
-      ],
-      "dtype": "fp32",
-      "route": "alternating",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        6889,
-        3072
-      ],
-      "dtype": "fp32",
-      "route": "alternating",
-      "layout": "strided"
     },
     {
       "shape": [
@@ -508,76 +128,6 @@
         6889,
         3072
       ],
-      "dtype": "fp32",
-      "route": "segmented",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        6889,
-        3072
-      ],
-      "dtype": "bf16",
-      "route": "all0",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        6889,
-        3072
-      ],
-      "dtype": "bf16",
-      "route": "all0",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        6889,
-        3072
-      ],
-      "dtype": "bf16",
-      "route": "all1",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        6889,
-        3072
-      ],
-      "dtype": "bf16",
-      "route": "all1",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        6889,
-        3072
-      ],
-      "dtype": "bf16",
-      "route": "alternating",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        6889,
-        3072
-      ],
-      "dtype": "bf16",
-      "route": "alternating",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        6889,
-        3072
-      ],
       "dtype": "bf16",
       "route": "random",
       "layout": "contiguous"
@@ -605,76 +155,6 @@
     {
       "shape": [
         3,
-        6889,
-        3072
-      ],
-      "dtype": "bf16",
-      "route": "segmented",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        6032,
-        3072
-      ],
-      "dtype": "fp32",
-      "route": "all0",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        6032,
-        3072
-      ],
-      "dtype": "fp32",
-      "route": "all0",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        6032,
-        3072
-      ],
-      "dtype": "fp32",
-      "route": "all1",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        6032,
-        3072
-      ],
-      "dtype": "fp32",
-      "route": "all1",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        6032,
-        3072
-      ],
-      "dtype": "fp32",
-      "route": "alternating",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        6032,
-        3072
-      ],
-      "dtype": "fp32",
-      "route": "alternating",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
         6032,
         3072
       ],
@@ -689,88 +169,8 @@
         3072
       ],
       "dtype": "fp32",
-      "route": "random",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        6032,
-        3072
-      ],
-      "dtype": "fp32",
       "route": "segmented",
       "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        6032,
-        3072
-      ],
-      "dtype": "fp32",
-      "route": "segmented",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        6032,
-        3072
-      ],
-      "dtype": "bf16",
-      "route": "all0",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        6032,
-        3072
-      ],
-      "dtype": "bf16",
-      "route": "all0",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        6032,
-        3072
-      ],
-      "dtype": "bf16",
-      "route": "all1",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        6032,
-        3072
-      ],
-      "dtype": "bf16",
-      "route": "all1",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        6032,
-        3072
-      ],
-      "dtype": "bf16",
-      "route": "alternating",
-      "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        6032,
-        3072
-      ],
-      "dtype": "bf16",
-      "route": "alternating",
-      "layout": "strided"
     },
     {
       "shape": [
@@ -789,32 +189,12 @@
         3072
       ],
       "dtype": "bf16",
-      "route": "random",
-      "layout": "strided"
-    },
-    {
-      "shape": [
-        3,
-        6032,
-        3072
-      ],
-      "dtype": "bf16",
       "route": "segmented",
       "layout": "contiguous"
-    },
-    {
-      "shape": [
-        3,
-        6032,
-        3072
-      ],
-      "dtype": "bf16",
-      "route": "segmented",
-      "layout": "strided"
     }
   ],
-  "warmup": 5,
-  "repeat": 30,
+  "warmup": 3,
+  "repeat": 12,
   "seed": 386,
   "session": 0,
   "surfaces": [
@@ -834,5 +214,16 @@
     "cuda/triton": "independent CPU FP32 gold plus fixed-byte reference",
     "framework-select01": "independent CPU FP64 LayerNorm/autograd; no fixed-fold VJP"
   },
-  "performance_conclusion": "NONE UNTIL TARGET EXECUTION/REVIEW"
+  "performance_conclusion": "NONE UNTIL TARGET EXECUTION/REVIEW",
+  "surface_modes": {
+    "public-backend-production": [
+      "forward",
+      "backward-only",
+      "forward+backward"
+    ],
+    "dispatch-production": [
+      "forward+backward"
+    ]
+  },
+  "scope": "selected production latency/memory and within-process dispersion; no inter-process stability"
 }

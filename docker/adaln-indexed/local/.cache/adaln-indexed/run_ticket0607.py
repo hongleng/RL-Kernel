@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import time
 import traceback
 from zoneinfo import ZoneInfo
 
@@ -28,6 +29,10 @@ HELPERS = (
     ".cache/adaln-indexed/benchmark_adaln_indexed.py",
     ".cache/adaln-indexed/test_benchmark_adaln_indexed.py",
     ".cache/adaln-indexed/runpod-0607.md",
+    ".cache/adaln-indexed/evidence_io.py",
+    ".cache/adaln-indexed/test_acceptance_reuse.py",
+    ".cache/adaln-indexed/test_publish_preflight.py",
+    ".cache/adaln-indexed/acceptance-pr-v2.md",
     ".cache/adaln-indexed/spec.md",
     ".cache/adaln-indexed/issues/06-target-qualification-and-strict.md",
     ".cache/adaln-indexed/issues/07-indexed-benchmark.md",
@@ -36,11 +41,17 @@ TOOLS = ("memcheck", "racecheck", "initcheck", "synccheck")
 
 
 def sha(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def write(path, value):
-    path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n")
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n")
+    temporary.replace(path)
 
 
 def inventory(root=ROOT):
@@ -76,18 +87,81 @@ def task_name(task):
 def execute(command, log, *, cwd=ROOT, env=None):
     """No retry and no polling; preserve failing process output."""
     with log.open("x") as stream:
-        subprocess.run(
-            command,
-            cwd=cwd,
-            env=env,
-            stdout=stream,
-            stderr=subprocess.STDOUT,
-            check=True,
-        )
+        started = time.monotonic()
+        status = "FAIL"
+        timestamp = datetime.now(ZoneInfo("Asia/Shanghai")).isoformat()
+        try:
+            subprocess.run(
+                command, cwd=cwd, env=env, stdout=stream, stderr=subprocess.STDOUT, check=True
+            )
+            status = "COMPLETE"
+        finally:
+            elapsed = time.monotonic() - started
+            write(
+                log.with_name(log.name + ".timing.json"),
+                dict(state=status, started=timestamp, elapsed_seconds=elapsed, command=command),
+            )
+            print(status, log.name, f"{elapsed:.1f}s", flush=True)
 
 
-def prepare(out, sessions=3):
+def isolated_command(package, code):
+    deps = [p for p in sys.path if "site-packages" in p]
+    paths = [str(package), str(package / ".cache/adaln-indexed")]
+    bootstrap = (
+        "import sys; sys.path[:0] = "
+        + repr(paths)
+        + "; sys.path.extend("
+        + repr(deps)
+        + "); "
+        + code
+    )
+    return [sys.executable, "-S", "-c", bootstrap]
+
+
+def cpu_preflight(package, dest):
+    probe = (
+        "import json; from pathlib import Path; import rl_engine; "
+        "from rl_engine.backends.extension import _C, _EXT_AVAILABLE; "
+        "print(json.dumps(dict(package=rl_engine.__file__, extension_available=_EXT_AVAILABLE, "
+        "loaded_binary=getattr(_C,'__file__',None))),flush=True); "
+        "assert Path(rl_engine.__file__).resolve().parent == Path("
+        + repr(str(package / "rl_engine"))
+        + "), 'CPU preflight imported another checkout'; "
+        "assert not _EXT_AVAILABLE, 'CPU preflight requires an extension-free snapshot'; "
+        "import pytest; sys.exit(pytest.main(sys.argv[1:]))"
+    )
+    names = (
+        ".cache/adaln-indexed/test_acceptance_reuse.py",
+        ".cache/adaln-indexed/test_ticket0607.py",
+        ".cache/adaln-indexed/test_benchmark_adaln_indexed.py",
+        ".cache/adaln-indexed/test_publish_preflight.py",
+        "tests/reference/test_adaln_indexed.py",
+        "tests/runtime/test_adaln_strict_policy.py",
+    )
+    native_selection = (
+        "not explicit_indexed_activation_resolves_without_enabling_cpu_select01 "
+        "and not activated_strict_rechecks_actual_domain_before_execution "
+        "and not ordinary_gpu_resolution_rechecks_shared_cpu_device_with_real_fallback"
+    )
+    execute(
+        isolated_command(package, probe)
+        + [
+            *[str(package / n) for n in names],
+            "-q",
+            "-k",
+            native_selection,
+            "--junitxml=" + str(dest / "cpu.xml"),
+        ],
+        dest / "cpu.log",
+        cwd=package,
+        env=dict(os.environ, CUDA_VISIBLE_DEVICES="", OMP_NUM_THREADS="1"),
+    )
+
+
+def prepare(out, sessions=1, profile="pr-v2"):
     out.mkdir(parents=True, exist_ok=False)
+    write(out / "candidate.json", dict(state="PREPARING", output_path=str(out)))
+    write(out / "state.json", dict(state="PREPARING", completed={}, sessions={}))
     baseline = inventory()
     package = out / "candidate-source"
     for name in baseline:
@@ -103,6 +177,7 @@ def prepare(out, sessions=3):
             "state": "COMMAND_PREPARED",
             "source_sha256": sha(out / "source-sha256.json"),
             "archive_sha256": sha(out / "candidate-source.tar.gz"),
+            "output_path": str(out),
             "head": subprocess.check_output(
                 ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
             ).strip(),
@@ -115,9 +190,27 @@ def prepare(out, sessions=3):
         },
     )
     env = dict(os.environ, CUDA_VISIBLE_DEVICES="")
+    collected = {}
     for task in sum(tasks(), []):
         backend, suite, tool = task
         dest = out / "collection" / task_name(task)
+        selector = (backend, suite)
+        if selector in collected:
+            original = collected[selector]
+            dest.mkdir(parents=True)
+            for name in ("nodes.json", "node-details.json"):
+                shutil.copyfile(original / name, dest / name)
+            write(
+                dest / "collection-reuse.json",
+                dict(
+                    source=str(original.relative_to(out)),
+                    selector=list(selector),
+                    nodes_sha256=sha(dest / "nodes.json"),
+                    scope="collection only; every suite still executes independently",
+                ),
+            )
+            continue
+        collected[selector] = dest
         command = [
             sys.executable,
             str(ROOT / HELPERS[0]),
@@ -132,7 +225,10 @@ def prepare(out, sessions=3):
         execute(command, out / (task_name(task) + "-collection.log"), env=env)
     from benchmark_adaln_indexed import parse_args, plan
 
-    write(out / "performance-plan.json", plan(parse_args(["--output", str(out / "performance")])))
+    write(
+        out / "performance-plan.json",
+        plan(parse_args(["--output", str(out / "performance"), "--profile", profile])),
+    )
     write(
         out / "node-lock.json",
         {
@@ -144,6 +240,7 @@ def prepare(out, sessions=3):
     candidate["node_lock_sha256"] = sha(out / "node-lock.json")
     candidate["performance_plan_sha256"] = sha(out / "performance-plan.json")
     candidate["sessions"] = sessions
+    candidate["profile"] = profile
     write(out / "candidate.json", candidate)
     write(
         out / "state.json",
@@ -237,7 +334,7 @@ def receipt(directory):
 
 
 def verify_saved_evidence(out, state):
-    for namespace in ("completed", "artifacts", "sessions"):
+    for namespace in ("completed", "artifacts", "sessions", "preflight"):
         for name, record in state.get(namespace, {}).items():
             if receipt(out / record["path"]) != record["receipt"]:
                 raise RuntimeError(f"prior evidence changed: {namespace}/{name}")
@@ -282,9 +379,9 @@ def check_result(out, task, directory=None):
             if identity[worker_key] != target[target_key]:
                 raise RuntimeError("worker target identity mismatch: " + worker_key)
     reports = json.loads((dest / "reports.json").read_text())
-    calls = {r["node"] for r in reports if r["phase"] == "call" and r["outcome"] == "passed"}
-    if calls != set(nodes) or any(r["outcome"] != "passed" or r["xfail"] for r in reports):
-        raise RuntimeError(f"{dest}: requires zero skip/xfail/xpass and all phases PASS")
+    from evidence_io import verify_reports
+
+    verify_reports(nodes, reports)
 
 
 def run(out, phase, sessions):
@@ -293,6 +390,17 @@ def run(out, phase, sessions):
         verify_candidate(out)
         if sessions != json.loads((out / "candidate.json").read_text())["sessions"]:
             raise RuntimeError("session count differs from locked plan")
+        verify_saved_evidence(out, state)
+        if not state.get("preflight"):
+            dest = next_attempt(out / "preflight", "cpu")
+            dest.mkdir()
+            write(out / "progress.json", dict(stage="CPU preflight", attempt=dest.name))
+            print("START CPU preflight", flush=True)
+            cpu_preflight(out / "candidate-source", dest)
+            state["preflight"] = {
+                "cpu": dict(path=str(dest.relative_to(out)), receipt=receipt(dest))
+            }
+            write(out / "state.json", state)
         identity = target_identity()
         prior = out / "target.json"
         stable = {
@@ -322,6 +430,8 @@ def run(out, phase, sessions):
         initial_binary = sha(binary) if binary.exists() else None
         # Recheck every previously accepted receipt before resuming; never splice identities.
         verify_saved_evidence(out, state)
+        state.update(state="RUNNING", error=None, traceback=None)
+        write(out / "state.json", state)
         env = dict(os.environ, OMP_NUM_THREADS="1")
         correctness, sanitizers = tasks()
         selected = (
@@ -349,8 +459,12 @@ def run(out, phase, sessions):
                 "--output",
                 str(dest),
             ]
+            if backend != "triton" and "cuda-correctness" in state["completed"]:
+                shared = out / state["completed"]["cuda-correctness"]["path"] / "build.json"
+                command += ["--reuse-build", str(shared)]
             if tool:
                 command += ["--sanitizer", tool]
+            write(out / "progress.json", dict(stage="suite", task=name, attempt=dest.name))
             print("START", name, flush=True)
             execute(command, out / (dest.name + ".log"), env=env)
             check_result(out, task, dest)
@@ -364,7 +478,14 @@ def run(out, phase, sessions):
         verify_candidate(out)
         if (sha(binary) if binary.exists() else None) != initial_binary:
             raise RuntimeError("checkout _C.so changed")
-        state["state"] = "EXECUTION_COMPLETE_REVIEW_PENDING"
+        required = {task_name(t) for t in sum(tasks(), [])}
+        complete = (
+            set(state["completed"]) == required
+            and set(state.get("artifacts", {})) == required
+            and set(state["sessions"]) == {str(i) for i in range(sessions)}
+        )
+        state["state"] = "EXECUTION_COMPLETE_REVIEW_PENDING" if complete else "PHASE_COMPLETE"
+        write(out / "progress.json", dict(stage=state["state"]))
     except (Exception, KeyboardInterrupt) as exc:
         state.update(state="FAIL", error=str(exc), traceback=traceback.format_exc())
         write(next_attempt(out / "failures", "batch"), state)
@@ -403,27 +524,7 @@ def extract_artifacts(out, state, env):
             if tool_path is None:
                 raise RuntimeError("missing cuobjdump")
             tool = Path(tool_path).resolve()
-            write(
-                dest / "extraction.json",
-                dict(
-                    binary=built["binary"],
-                    binary_sha256=sha(Path(built["binary"])),
-                    tool=str(tool),
-                    tool_sha256=sha(tool),
-                    scope="extraction only; arithmetic/coverage review pending",
-                ),
-            )
-            for label, option in (
-                ("version", "--version"),
-                ("ptx", "--dump-ptx"),
-                ("sass", "--dump-sass"),
-                ("resources", "--dump-resource-usage"),
-            ):
-                execute(
-                    [str(tool), option] + ([] if label == "version" else [built["binary"]]),
-                    dest / (label + ".log"),
-                    env=env,
-                )
+            extract_native(out, state, built, dest, tool, env)
         else:
             write(
                 dest / "shared-cache.json",
@@ -436,6 +537,53 @@ def extract_artifacts(out, state, env):
         write(out / "state.json", state)
 
 
+NATIVE_EXTRACTION_OPTIONS = ("--version", "--dump-ptx", "--dump-sass", "--dump-resource-usage")
+
+
+def extract_native(out, state, built, dest, tool, env):
+    from evidence_io import verify_native_extraction
+
+    if sha(Path(built["binary"])) != built["binary_sha256"]:
+        raise RuntimeError("native binary hash mismatch before extraction")
+    identity = dict(
+        binary_sha256=built["binary_sha256"],
+        tool_sha256=sha(tool),
+        options=list(NATIVE_EXTRACTION_OPTIONS),
+    )
+    for record in state["artifacts"].values():
+        metadata = out / record["path"] / "extraction.json"
+        if not metadata.exists():
+            continue
+        prior = json.loads(metadata.read_text())
+        if prior["identity"] == identity:
+            verify_native_extraction(out, prior)
+            write(dest / "extraction.json", dict(prior, reused_from=record["path"]))
+            return
+    for label, option in zip(
+        ("version", "ptx", "sass", "resources"), NATIVE_EXTRACTION_OPTIONS, strict=True
+    ):
+        execute(
+            [str(tool), option] + ([] if label == "version" else [built["binary"]]),
+            dest / (label + ".log"),
+            env=env,
+        )
+    metadata = dict(
+        identity=identity,
+        binary=built["binary"],
+        binary_sha256=built["binary_sha256"],
+        tool=str(tool),
+        tool_sha256=sha(tool),
+        output_path=str(dest.relative_to(out)),
+        files_sha256={
+            name: sha(dest / name)
+            for name in ("version.log", "ptx.log", "sass.log", "resources.log")
+        },
+        scope="extraction only; independent per-suite execution and instruction review required",
+    )
+    verify_native_extraction(out, metadata)
+    write(dest / "extraction.json", metadata)
+
+
 def performance(out, state, sessions, env):
     # Fresh process without profiler/sanitizer; only reuse the pinned fresh native binary.
     from benchmark_adaln_indexed import summarize_sessions
@@ -443,45 +591,46 @@ def performance(out, state, sessions, env):
     built = json.loads(
         (out / state["completed"]["cuda-correctness"]["path"] / "build.json").read_text()
     )
-    deps = [p for p in sys.path if "site-packages" in p]
     for session in range(sessions):
-        dest = next_attempt(out / "performance", str(session))
         if str(session) in state["sessions"]:
             record = state["sessions"][str(session)]
             if receipt(out / record["path"]) != record["receipt"]:
                 raise RuntimeError("performance evidence changed")
             continue
+        dest = next_attempt(out / "performance", str(session))
         verify_candidate(out)
         package = out / "performance-source" / dest.name
         shutil.copytree(out / "candidate-source", package)
         (package / "rl_engine/_C.so").symlink_to(built["binary"])
         script = package / ".cache/adaln-indexed/benchmark_adaln_indexed.py"
-        bootstrap = (
-            "import sys,runpy; sys.path.extend("
-            + repr(deps)
-            + "); runpy.run_path("
-            + repr(str(script))
-            + ",run_name='__main__')"
-        )
-        command = [
-            sys.executable,
-            "-S",
-            "-c",
-            bootstrap,
-            "--output",
-            str(dest),
-            "--session",
-            str(session),
+        command = isolated_command(
+            package, "import runpy; runpy.run_path(" + repr(str(script)) + ",run_name='__main__')"
+        ) + ["--output", str(dest), "--session", str(session)]
+        locked = json.loads((out / "performance-plan.json").read_text())
+        profile = json.loads((out / "candidate.json").read_text())["profile"]
+        command += [
+            "--profile",
+            profile,
+            "--warmup",
+            str(locked["warmup"]),
+            "--repeat",
+            str(locked["repeat"]),
+            "--seed",
+            str(locked["seed"]),
+            "--oracle-cache",
+            str(out / "oracles"),
         ]
+        write(out / "progress.json", dict(stage="performance", session=session, attempt=dest.name))
+        print("START performance", session, dest.name, flush=True)
         execute(
             command,
             out / ("performance-" + dest.name + ".log"),
             cwd=package,
             env=dict(env, PYTHONPATH=str(package)),
         )
-        report = json.loads((dest / "report.json").read_text())
-        if report["state"] != "EXECUTION_COMPLETE_REVIEW_PENDING":
-            raise RuntimeError("performance session failed")
+        from evidence_io import verify_performance
+
+        report = verify_performance(dest, locked, session, built["binary_sha256"])
         if report["environment"]["binary_sha256"] != built["binary_sha256"]:
             raise RuntimeError("performance loaded binary differs from fresh build")
         state["sessions"][str(session)] = dict(
@@ -504,33 +653,48 @@ def main(argv=None):
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--prepare", action="store_true", help="CPU collection only; no build/GPU")
     parser.add_argument(
+        "--cpu-preflight",
+        action="store_true",
+        help="isolated CPU checks of an extension-free snapshot; no collection/build/GPU",
+    )
+    parser.add_argument(
         "--phase",
         choices=("all", "correctness", "sanitizer", "performance"),
         default="all",
     )
-    parser.add_argument("--sessions", type=int, default=3)
+    parser.add_argument("--profile", choices=("pr-v2",), default="pr-v2")
+    parser.add_argument("--sessions", type=int, choices=(1,), default=1)
     parser.add_argument("--start", action="store_true", help="prepare then run the complete batch")
     args = parser.parse_args(argv)
-    if args.sessions < 2:
-        parser.error("at least two independent performance sessions required")
     out = args.output.resolve()
-    if args.prepare and args.start:
-        parser.error("--prepare and --start are mutually exclusive")
+    if sum((args.prepare, args.start, args.cpu_preflight)) > 1:
+        parser.error("--prepare, --start and --cpu-preflight are mutually exclusive")
+    if args.cpu_preflight:
+        out.mkdir(parents=True, exist_ok=False)
+        cpu_preflight(ROOT, out)
+        return 0
     if args.prepare or args.start:
         was_new = not out.exists()
         try:
-            prepare(out, args.sessions)
+            prepare(out, args.sessions, args.profile)
         except (Exception, KeyboardInterrupt) as exc:
             if was_new and out.exists():
                 write(
                     next_attempt(out / "failures", "prepare"),
                     dict(state="FAIL", error=str(exc), traceback=traceback.format_exc()),
                 )
+                state_path = out / "state.json"
+                saved = json.loads(state_path.read_text()) if state_path.exists() else {}
+                saved.update(state="FAIL", error=str(exc))
+                write(state_path, saved)
             print("FAIL preparing:", exc, file=sys.stderr)
             return 1
         if args.prepare:
             return 0
-    return run(out, args.phase, args.sessions)
+    from evidence_io import exclusive_output
+
+    with exclusive_output(out):
+        return run(out, args.phase, args.sessions)
 
 
 if __name__ == "__main__":

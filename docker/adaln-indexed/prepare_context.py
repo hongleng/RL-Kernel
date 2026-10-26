@@ -27,17 +27,23 @@ def main():
         check=True,
     )
     subprocess.run(["git", "checkout", "--quiet", "--detach", "FETCH_HEAD"], cwd=out, check=True)
-    shutil.copytree(assets / "local", out, dirs_exist_ok=True)
+    # Overlay bytes are locked separately from the operator commit.
+    actual = {str(p.relative_to(assets / "local")): hashlib.sha256(p.read_bytes()).hexdigest()
+              for p in (assets / "local").rglob("*") if p.is_file() and "__pycache__" not in p.parts}
+    if actual != config["acceptance_sha256"]:
+        raise RuntimeError("acceptance overlay differs from source.json lock")
+    shutil.copytree(assets / "local", out, dirs_exist_ok=True,
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     metadata = out / "image-acceptance"
     metadata.mkdir()
     for name in (
         "selfcheck.py",
-        "followup_benchmark.py",
         "source.json",
         "environment.json",
         "requirements.txt",
         "expected-node-lock.json",
         "expected-performance-plan.json",
+        "README.md",
     ):
         shutil.copyfile(assets / name, metadata / name)
     shutil.copyfile(assets / "Dockerfile", out / "Dockerfile")

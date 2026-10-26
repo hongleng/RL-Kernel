@@ -226,3 +226,6 @@ csrc/hip/*_hip.hip
 .rlk-profile.json
 
 /artifacts/
+
+# Image acceptance overlays are source assets, including newly added local runners.
+!docker/adaln-indexed/local/.cache/

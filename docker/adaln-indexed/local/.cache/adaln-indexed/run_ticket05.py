@@ -1,7 +1,8 @@
 """User-run AdaLN acceptance. Collection never builds or runs GPU kernels.
 
 Every invocation snapshots real source into a NEW output. CUDA/integration runs
-build there; Triton L3 really has no extension. Active checkout _C.so is untouched.
+build there or reuse an identity-checked batch build; Triton L3 has no extension.
+Active checkout _C.so is untouched.
 """
 
 import argparse
@@ -16,7 +17,11 @@ import sys
 
 
 def sha(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def write(path, value):
@@ -69,7 +74,24 @@ def selection(backend, suite):
     return indexed, expr
 
 
-def build(out):
+def validate_reuse(record, identity):
+    if record.get("reuse_identity") != identity:
+        raise RuntimeError("native build identity mismatch")
+    binary = Path(record["binary"])
+    if sha(binary) != record["binary_sha256"]:
+        raise RuntimeError("native binary hash mismatch")
+    return binary
+
+
+def build_options(capability):
+    return dict(
+        arch=".".join(map(str, capability)) + "+PTX",
+        cflags=["-O2", "-std=c++17"],
+        nvcc_flags=["-O3", "--fmad=false", "--ftz=false", "-lineinfo"],
+    )
+
+
+def build(out, reuse=None):
     import torch
     from torch.utils.cpp_extension import CUDA_HOME, load
 
@@ -92,9 +114,9 @@ def build(out):
     cuda = Path("csrc/cuda/norm/adaln_modulation.cu").resolve()
     os.environ["MAX_JOBS"] = "1"
     os.environ["PATH"] = str(Path(sys.executable).parent) + os.pathsep + os.environ["PATH"]
-    os.environ["TORCH_CUDA_ARCH_LIST"] = ".".join(map(str, torch.cuda.get_device_capability()))
-    cflags = ["-O2", "-std=c++17"]
-    nvflags = ["-O3", "--fmad=false", "--ftz=false", "-lineinfo"]
+    options = build_options(torch.cuda.get_device_capability())
+    os.environ["TORCH_CUDA_ARCH_LIST"] = options["arch"]
+    cflags, nvflags = options["cflags"], options["nvcc_flags"]
     compiler_identity = {}
     for name, executable in {
         "cxx": os.environ.get("CXX", "c++"),
@@ -107,6 +129,31 @@ def build(out):
             "sha256": sha(path),
             "version": subprocess.check_output([str(path), "--version"], text=True),
         }
+    identity = dict(
+        sources={str(p.relative_to(Path.cwd())): sha(p) for p in (binding.resolve(), cuda)},
+        binding_sha256=sha(source),
+        runner_sha256=sha(Path(__file__)),
+        cflags=cflags,
+        nvcc_flags=nvflags,
+        arch=os.environ["TORCH_CUDA_ARCH_LIST"],
+        compiler_identity=compiler_identity,
+        python=sys.version,
+        executable=sys.executable,
+        torch=torch.__version__,
+        cuda=torch.version.cuda,
+        cxx11_abi=torch._C._GLIBCXX_USE_CXX11_ABI,
+        environment={
+            k: os.environ.get(k)
+            for k in ("CC", "CXX", "CUDA_HOME", "CFLAGS", "CXXFLAGS", "LDFLAGS")
+        },
+        instrumentation="compute-sanitizer runtime; lineinfo binary, no compile instrumentation",
+    )
+    if reuse is not None:
+        record = json.loads(reuse.read_text())
+        binary = validate_reuse(record, identity)
+        Path("rl_engine/_C.so").symlink_to(binary)
+        write(out / "build.json", dict(record, reused_from=str(reuse)))
+        return 0
     extension = load(
         name="_C",
         sources=[str(source), str(cuda)],
@@ -120,6 +167,7 @@ def build(out):
     write(
         out / "build.json",
         {
+            "reuse_identity": identity,
             "scope": "fresh AdaLN-only production CUDA + exact production AdaLN bindings",
             "full_extension": False,
             "compiler_identity": compiler_identity,
@@ -281,6 +329,7 @@ def main():
         "suite", choices=["correctness", "sanitizer", "large-offsets", "target", "shared"]
     )
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--reuse-build", type=Path)
     parser.add_argument("--collect-only", action="store_true")
     parser.add_argument("--sanitizer", choices=["memcheck", "racecheck", "initcheck", "synccheck"])
     parser.add_argument("--stage", choices=["build", "test"], help=argparse.SUPPRESS)
@@ -291,7 +340,11 @@ def main():
         parser.error("--sanitizer requires sanitizer suite")
     out = args.output.resolve()
     if args.stage:
-        return build(out) if args.stage == "build" else worker(args, out)
+        return build(out, args.reuse_build) if args.stage == "build" else worker(args, out)
+    if args.reuse_build and (args.collect_only or args.backend == "triton"):
+        parser.error("reuse-build is only valid for native execution")
+    if args.reuse_build:
+        args.reuse_build = args.reuse_build.resolve()
     checkout = Path.cwd().resolve()
     out.mkdir(parents=True, exist_ok=False)
     source = out / "source"
@@ -347,6 +400,8 @@ def main():
     base = [sys.executable, "-S", "-c", bootstrap, args.backend, args.suite, "--output", str(out)]
     if args.collect_only:
         base += ["--collect-only"]
+    if args.reuse_build:
+        base += ["--reuse-build", str(args.reuse_build)]
     if not args.collect_only and args.backend != "triton":
         with (out / "build.log").open("w") as log:
             result = subprocess.run(
