@@ -830,5 +830,9 @@
   "cold": "first candidate validation forward/backward wall; JIT/cache lookup included; cache initially empty per process; reused specializations explicitly possible",
   "memory": "allocated/reserved peaks, baseline and allocated peak-minus-baseline; not a direct scratch-only measurement",
   "qualification": "NOT OPENED",
+  "accuracy_references": {
+    "cuda/triton": "independent CPU FP32 gold plus fixed-byte reference",
+    "framework-select01": "independent CPU FP64 LayerNorm/autograd; no fixed-fold VJP"
+  },
   "performance_conclusion": "NONE UNTIL TARGET EXECUTION/REVIEW"
 }

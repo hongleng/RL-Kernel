@@ -32,6 +32,7 @@ def main():
     metadata.mkdir()
     for name in (
         "selfcheck.py",
+        "followup_benchmark.py",
         "source.json",
         "environment.json",
         "requirements.txt",

@@ -29,7 +29,7 @@ gh workflow run adaln-h100-image.yml --repo hongleng/RL-Kernel \
 ```
 
 Actions checks source hashes, HEAD, Python3.11 syntax, pinned environment and pip
-dependencies, runs 158 CPU harness/reference/policy checks plus an extension-free
+dependencies, runs 159 CPU harness/reference/policy checks plus an extension-free
 Triton-to-CPU fallback self-check, then collects all
 17 suites without GPU execution or extension compilation. Actual node IDs and
 the performance plan must equal the reviewed candidate locks. Failures stop the
@@ -45,6 +45,40 @@ The self-check verifies actual source import, absence of a native binary, real
 Triton selection, CPU fallback reason and forward/backward bytes. Local validation
 must use isolated Python `-S` with explicit site-packages to prevent editable import
 hooks from loading another checkout's native extension.
+
+## Baseline accuracy and completed-evidence follow-up
+
+The indexed CUDA/Triton paths retain the independent CPU FP32 gold and strict
+fixed-byte reference. The framework select01 baseline has no FP32 token-fold
+promise. Its accuracy is checked against independent CPU FP64 LayerNorm/autograd,
+with the same dtype-specific tolerances and unmodified inputs/upstreams. This
+avoids treating the FP32 serial gold's cancellation error as baseline error.
+FP64 references are CPU-only, outside all timing intervals; extra host memory is
+needed (64GiB host RAM remains recommended). Gate bytes still use the fixed reference.
+
+If the original batch completed all 17 suites/artifact steps but failed its first
+performance session on the old baseline oracle, keep that batch immutable.
+`image-acceptance/followup_benchmark.py` can run the corrected benchmark separately:
+
+```bash
+cd /opt/RL-Kernel-indexed
+python image-acceptance/followup_benchmark.py \
+  --evidence /workspace/adaln-indexed-20261026-01/run \
+  --benchmark .cache/adaln-indexed/benchmark_adaln_indexed.py \
+  --output /workspace/adaln-indexed-20261026-01/benchmark-fp64-followup
+```
+
+For an existing Pod with the old image, download the new follow-up driver and
+benchmark beside the evidence, outside the original checkout, and pass their
+paths instead. Do not overwrite the locked original benchmark or its manifests.
+The driver verifies the original candidate/receipts, every suite/artifact step,
+target/compiler/runtime and fresh binary. Three isolated sessions copy the original
+source and change only the benchmark; input cases, seed, modes, repetitions and
+production source/binary hashes must match. New provenance binds the driver and
+benchmark hashes to the original evidence. Original FAIL and partial samples stay
+unchanged; the follow-up is separate evidence requiring independent review, not a
+new PASS label for the original batch. Include the follow-up directory when
+returning the evidence.
 
 The artifact `adaln-indexed-image-evidence` contains the published image digest,
 source/infra/workflow commits, CPU JUnit, exact node lists, performance plan,

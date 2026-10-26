@@ -147,6 +147,10 @@ def plan(args):
         "memory": "allocated/reserved peaks, baseline and allocated peak-minus-baseline; "
         "not a direct scratch-only measurement",
         "qualification": "NOT OPENED",
+        "accuracy_references": {
+            "cuda/triton": "independent CPU FP32 gold plus fixed-byte reference",
+            "framework-select01": "independent CPU FP64 LayerNorm/autograd; no fixed-fold VJP",
+        },
         "performance_conclusion": "NONE UNTIL TARGET EXECUTION/REVIEW",
     }
 
@@ -190,6 +194,24 @@ def reference_outputs(inputs):
     )
 
 
+def baseline_reference_outputs(inputs):
+    """FP64 accuracy oracle for the baseline, which promises no FP32 fold order."""
+    cpu = tuple(
+        t.detach()
+        .to(device="cpu", dtype=t.dtype if i == 2 else torch.float64)
+        .requires_grad_(i in (0, 1))
+        for i, t in enumerate(inputs)
+    )
+
+    def forward(x, m, *, modulate_index, eps):
+        norm = torch.nn.functional.layer_norm(x, (x.shape[-1],), eps=eps)
+        rows = torch.arange(x.shape[0])[:, None] + modulate_index.long() * x.shape[0]
+        shift, scale, gate = m[rows].chunk(3, dim=-1)
+        return norm * (1 + scale) + shift, gate
+
+    return tuple(t.detach() for t in evaluate(forward, cpu))
+
+
 def validate_candidate(op, inputs, references, *, fixed_bytes=True, first_use=None):
     from rl_engine.contracts.numerical import load_contract, resolve_tolerance
     from tests.helpers.adaln_indexed import assert_bytes
@@ -206,7 +228,7 @@ def validate_candidate(op, inputs, references, *, fixed_bytes=True, first_use=No
             dtype=a.dtype,
         )
         torch.testing.assert_close(
-            a.detach().cpu().float(), gold, atol=tolerance.atol, rtol=tolerance.rtol
+            a.detach().cpu().to(gold.dtype), gold, atol=tolerance.atol, rtol=tolerance.rtol
         )
     return actual
 
@@ -369,6 +391,7 @@ def main(argv=None):
                     layout=case["layout"],
                 )
                 references = reference_outputs(cpu)
+                baseline_references = (references[0], baseline_reference_outputs(cpu))
                 data = make_inputs(
                     tuple(case["shape"]),
                     dtype,
@@ -390,7 +413,7 @@ def main(argv=None):
                     validate_candidate(
                         direct[backend],
                         data,
-                        references,
+                        baseline_references if backend == "framework-select01" else references,
                         fixed_bytes=backend != "framework-select01",
                         first_use=first,
                     )
@@ -404,7 +427,7 @@ def main(argv=None):
                     validate_candidate(
                         dispatch[backend],
                         data,
-                        references,
+                        baseline_references if backend == "framework-select01" else references,
                         fixed_bytes=backend != "framework-select01",
                     )
                     assert_backend(dispatch[backend], backend)
@@ -415,7 +438,7 @@ def main(argv=None):
                             trace=dispatch[backend].trace.copy(),
                         )
                     )
-                del references, cpu
+                del references, baseline_references, cpu
                 for surface, ops in (
                     ("public-backend-production", direct),
                     ("dispatch-production", dispatch),

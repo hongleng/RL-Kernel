@@ -192,3 +192,31 @@ def test_session_statistics_reject_failed_or_mismatched_samples():
         with pytest.raises(ValueError, match="input/sampling plan mismatch"):
             bench.summarize_sessions([report, second])
         second[key] = report[key]
+
+
+def test_framework_accuracy_uses_high_precision_sum_without_changing_indexed_bytes():
+    import pytest
+    from rl_engine.reference.norm.adaln_modulation import NativeAdaLNModulationOp
+    from rl_engine.reference.norm.adaln_indexed import IndexedAdaLNFixedReference
+
+    x = torch.zeros(1, 8, 2, requires_grad=True)
+    m = torch.zeros(2, 6, requires_grad=True)
+    index = torch.zeros(1, 8, dtype=torch.int32)
+    dy = torch.zeros_like(x)
+    dg = torch.zeros_like(x)
+    dg[0, :, 0] = torch.tensor([2**24, 1, 1, 1, -(2**24), 1, 1, 1])
+    inputs = (x, m, index, dy, dg)
+    references = bench.reference_outputs(inputs)
+    assert references[0][3][0, 4].item() == references[1][3][0, 4].item() == 3
+    precise = bench.baseline_reference_outputs(inputs)
+    assert precise[3][0, 4].item() == 6
+    baseline_refs = (references[0], precise)
+    bench.validate_candidate(NativeAdaLNModulationOp(), inputs, baseline_refs, fixed_bytes=False)
+    bench.validate_candidate(IndexedAdaLNFixedReference(), inputs, references)
+
+    def wrong(*args, **kwargs):
+        y, gate = NativeAdaLNModulationOp()(*args, **kwargs)
+        return y + 1, gate
+
+    with pytest.raises(AssertionError):
+        bench.validate_candidate(wrong, inputs, baseline_refs, fixed_bytes=False)
