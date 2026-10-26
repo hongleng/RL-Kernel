@@ -9,6 +9,9 @@ The base image digest in `source.json` preserves the previous successful
 CUDA12.6.3 / Python3.11.17 / Torch2.12.1+cu126 / Triton3.7.1 environment and its
 split dependency layers. The new workdir `/opt/RL-Kernel-indexed` keeps old shared
 source outside this batch. Pulling the image still transfers several GiB.
+The image adds pinned `tzdata==2026.5`: the batch timestamps resource receipts
+with `ZoneInfo("Asia/Shanghai")`, which needs timezone data missing from the base.
+The image self-check exercises that exact timezone lookup before GPU use.
 
 `prepare_context.py` makes a local shallow Git checkout of the pinned commit,
 without remotes or credentials, then adds the acceptance assets. This preserves

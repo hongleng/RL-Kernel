@@ -1,11 +1,18 @@
 """CPU-only checks of image source, pinned environment and exact collection."""
 
 import ast
+from datetime import datetime, timedelta
 import hashlib
 import json
 from pathlib import Path
 import subprocess
 import sys
+from zoneinfo import ZoneInfo
+
+
+def check_timezone():
+    assert datetime.now(ZoneInfo("Asia/Shanghai")).utcoffset() == timedelta(hours=8)
+    print("Launcher Asia/Shanghai timezone data PASS")
 
 
 def check_source(root):
@@ -54,6 +61,7 @@ def main():
     root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(root))
     check_source(root)
+    check_timezone()
     expected = json.loads((root / "image-acceptance/environment.json").read_text())
     import torch
     import triton

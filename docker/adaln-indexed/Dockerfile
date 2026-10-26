@@ -1,5 +1,8 @@
 FROM ghcr.io/hongleng/rl-kernel/adaln-h100@sha256:682fae9afbb852c75c7b519e9b80645e6528c0d8d034d29ed4bd35f0a5073ce4 AS runtime
 
+RUN uv pip install --python /opt/venv/bin/python \
+    --index-url https://pypi.org/simple --no-deps tzdata==2026.5
+
 # Reuse the pinned, split dependency layers; keep old shared source outside imports.
 WORKDIR /opt/RL-Kernel-indexed
 COPY . .
