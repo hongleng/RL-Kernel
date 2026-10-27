@@ -460,12 +460,22 @@ def main(argv=None):
     mode.add_argument("--verify", type=Path, metavar="ARCHIVE")
     parser.add_argument("--candidate-sha256")
     parser.add_argument(
+        "--full-backup", action="store_true",
+        help="explicitly request the large historical full backup; not the PR-review extraction",
+    )
+    parser.add_argument(
         "--partial", action="store_true", help="recover stopped/failed evidence; never acceptance"
     )
     parser.add_argument(
         "--send", action="store_true", help="runpodctl send after successful pack and content check"
     )
     args = parser.parse_args(argv)
+    if args.pack and not args.full_backup:
+        parser.error("PR review: use review_bundle.py extract; full backup requires --full-backup")
+    if args.verify and args.full_backup:
+        parser.error("--full-backup applies only to --pack")
+    if args.verify and ".review.tar" in args.verify.name:
+        parser.error("review bundles require review_bundle.py verify, not the full-backup verifier")
     if args.verify:
         if not args.candidate_sha256 or args.send:
             parser.error("local --verify requires --candidate-sha256 and does not send")

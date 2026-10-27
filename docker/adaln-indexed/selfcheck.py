@@ -27,7 +27,9 @@ def check_source(root):
     subprocess.run(["git", "diff", "--exit-code", "HEAD"], cwd=root, check=True)
     config = (root / ".git/config").read_text()
     assert "extraheader" not in config.lower() and "[remote " not in config.lower()
-    for script in (root / ".cache/adaln-indexed").rglob("*.py"):
+    scripts = list((root / ".cache/adaln-indexed").rglob("*.py"))
+    scripts.append(root / "image-acceptance/review_bundle.py")
+    for script in scripts:
         ast.parse(script.read_text(), filename=str(script), feature_version=(3, 11))
     print("Source, Git identity, credential-free config and Python3.11 syntax PASS")
 

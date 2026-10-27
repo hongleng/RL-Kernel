@@ -41,6 +41,8 @@ def main():
     metadata.mkdir()
     for name in (
         "selfcheck.py",
+        "review_bundle.py",
+        "REVIEW_BUNDLE.md",
         "source.json",
         "environment.json",
         "requirements.txt",

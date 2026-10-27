@@ -87,32 +87,40 @@ python .cache/adaln-indexed/run_ticket0607.py --profile pr-v2 --output "$ADALN_O
 旧范围只保留历史计划与起始脚本快照，不在当前入口提供执行选项；不要用 v2 恢复旧批次。
 旧范围未跑完不构成 v2 的追加义务；v2 按上面的本 PR 结论单独审核。
 
-## 同一路径回收，失败即停
+## 当前PR：只提取审核所需数据
 
-运行/归档/发送始终使用同一个 `ADALN_OUTPUT`。先结束运行再打包，禁止边写边回收；输出目录独占锁会拒绝并行恢复或运行中打包。
-标准库工具在 pack 前核对完整清单、receipts、report/raw cells；tar dereference 仅允许
-batch 内 symlink；任何失败非零退出，不调用 sender。全文件 index 覆盖日志/失败
-attempt/cache/generated code，tar/checksum 不排除 binary 或 JIT cache。
+此前默认 `evidence_io.py --pack` 全目录回收已停止推荐；它是完整备份，会包含大oracle缓存。
+当前使用独立的 `review_bundle.py extract/verify`，不能将新审核包交给旧 `evidence_io.py --verify`。
+原工具仍保留以读历史完整备份；新版本全量备份必须显式 `--full-backup`，不作为本PR默认命令。
+
+仅提取：原候选/环境/计划与一份源码archive、17套独立执行报告/JUnit/日志、成功session的report/raw samples、
+oracle的生成身份与hash、去重后的native binary及实际审计所需PTX/SASS/IR/cubin、存储恢复记录。
+不提取oracle.pt张量、重复源码包、原始build/cache/dump和失败session的raw/cache。
+这是PR审核数据，不是完整备份，也不声称离线重新计算了oracle或GPU结果。
+
+下载已发布、固定SHA256的工具到 `/workspace/review-bundle.py` 后，访问保留Volume的终端中执行：
 
 ```bash
-python .cache/adaln-indexed/evidence_io.py --pack "$ADALN_OUTPUT"
-# 仅在已配置 runpodctl 时，可把上一条加 --send；先打包和隔离解包检查，再发送 archive/checksum。
+python /workspace/review-bundle.py extract --output /workspace/evidence/adaln-indexed-storage-v1
 ```
 
-记录输出的 `CANDIDATE` hash，下载 tar.gz 和 .sha256 后，在本地运行同版本脚本：
+不依赖新终端是否继承ADALN_OUTPUT。入口先显示选中大小；默认超过1024MiB就停止而不是盲目打包。
+可加 `--plan` 只预览，不写包。无需启动任何GPU测试；Pod已Stop时保持停止直到工具与访问方案准备好。
+生成 `.review.tar.gz` 与 `.review.tar.gz.sha256`，打印实际CANDIDATE hash；小包用gzip1，进度可见。
+原目录/旧归档不覆盖；仅当退出码为0才传输这两个文件。存在仍在运行的旧打包时不并行提取。
+
+本地下载相同版本工具、小包和checksum后，在文件所在目录执行：
 
 ```bash
-python3 /home/dnd/personal-project/RL-Kernel-adaln-indexed/.cache/adaln-indexed/evidence_io.py \
-  --verify /path/to/adaln-indexed-storage-v1.tar.gz --candidate-sha256 COPY_CANDIDATE_HASH
+read -r -p '粘贴提取输出的 CANDIDATE hash: ' CANDIDATE_SHA256
+python3 review-bundle.py verify \
+  --archive adaln-indexed-storage-v1.review.tar.gz \
+  --candidate-sha256 "$CANDIDATE_SHA256" \
+  --dest adaln-indexed-pr-review
 ```
 
-verify 检查 checksum、成员安全性并隔离解包，核对批次身份、文件 index、原始状态、
-套件/JUnit/日志、生成产物 receipt、性能计划及每个 raw cell/repeat 和 summary。
-只有**本地** verify 成功才能宣布回收完整并建议结束资源；这不是证据接受或资格激活。
-不会自动终止 Pod。空归档、错批次、缺文件和仅 checksum 正确都不能回收成功。
-用户主动停止/失败时 pack 与 verify 都显式加 `--partial`，只证明已产生证据回收，
-未完成义务仍可见；不为回收补跑 GPU。打包失败保留原目录和 `.tmp`，修复后保留失败
-临时包再重试，不能发送 `.tmp`。
+`--dest`保留可直接阅读的报告、样本和展开源码，拒绝覆盖已有目录。只有本地返回 `REVIEW_BUNDLE_VERIFIED` 才能宣布这份PR审核数据回收成功；GPU、性能及指令接受仍需审核。
+当前工具面向已完成的17suite/单session批次；未完成批次不要用旧 `--partial` 混作这份审核包。
 
 
 ## 全部脚本与自动调用顺序
@@ -128,8 +136,8 @@ verify 检查 checksum、成员安全性并隔离解包，核对批次身份、�
 | Pod，runner 自动调用 | `run_ticket05.py BACKEND sanitizer --sanitizer TOOL` | CUDA/Triton 各 memcheck/racecheck/initcheck/synccheck；每工具199/153节点，共1408节点调用；`--target-processes all`；不被其他 backend/tool 的 PASS 代替 |
 | Pod，runner 自动调用 | native `cuobjdump` / `audit_ticket05_artifacts.py` | native PTX/SASS/resources 只提取1次并按身份共享；7个 indexed Triton suite 分别审核缓存/生成物，shared Triton单独保留；产物提取不代表人工语义/覆盖审核完成 |
 | Pod，runner 自动调用 | `benchmark_adaln_indexed.py` | fresh process/空 Triton cache；18 cases、3 backends；direct三模式、dispatch完整F+B；216 cells；3 warmup/12 repeat；2592 raw samples，含warmup3240 calls |
-| Pod，用户回收入口 | `evidence_io.py --pack "$ADALN_OUTPUT" [--send]` | 锁住已停止的输出目录，核对、归档、隔离内容检查；成功后才可 send；仍报告 LOCAL_VERIFICATION_PENDING |
-| 本地，用户回收确认入口 | `evidence_io.py --verify ARCHIVE --candidate-sha256 HASH` | checksum、隔离解包、candidate、全文件 index、reports/raw samples/共享指令引用等完整检查；通过才报告回收完整 |
+| 可访问Volume的终端，审核提取 | `review_bundle.py extract --output OUTPUT` | 只取PR必需证据；oracle仅identity/hash；打印大小并去重；不运行GPU |
+| 本地，审核数据验证 | `review_bundle.py verify --archive ARCHIVE --candidate-sha256 HASH` | checksum、对象hash、selected receipt、17suite、raw样本与源码核对；不是完整备份验证 |
 
 6 个 CPU harness 文件是 `test_ticket0607.py`、`test_benchmark_adaln_indexed.py`、
 `test_acceptance_reuse.py`、`test_publish_preflight.py`、`test_disk_pressure.py`、`test_storage.py`。它们测试入口、复用/恢复、
@@ -138,7 +146,7 @@ verify 检查 checksum、成员安全性并隔离解包，核对批次身份、�
 `run_ticket01.py`～`run_ticket04.py`、`run_ticket05_all.py` 和旧
 `followup_benchmark.py` 不在本批次调用链中；不需要逐个手动跑。
 恢复仍使用相同 runner/output 并去掉 `--start`，不额外运行一套旧批次。
-回收失败/主动停止批次时 pack/verify 均加 `--partial`，只确认已有材料回收。
+失败批次的历史全量备份另行处理；当前审核包不支持将部分结果标成完整PR证据。
 
 
 ## 满盘事故后的存储修复（2026-10-27）
@@ -200,15 +208,11 @@ GPU 子进程每秒由父进程做常数成本的可用空间/inode检查，不�
 checkpoint 保留。`state.json` 的旧 RUNNING 不能证明进程仍存活。查看进度只读小型
 `progress.json` 或最多2000字节的阶段日志，不再整份 cat receipt/state。
 
-### 归档及本地验证
+### 当前提取与历史备份的区别
 
-pack 前按实际文件数和体积检查归档+解包空间，verify 前按归档成员检查展开空间与inodes。
-隔离解包在归档所在文件系统创建临时目录，不依赖可能很小的容器 `/tmp`。
-目录 symlink 因无法直接界定展开量而拒绝；native file symlink 仍按真实目标保存并计入容量。
-
-本地回收验证需要同一镜像版本的 **evidence_io.py 和 storage.py** 两个相邻文件，或使用
-本仓库 `.cache/adaln-indexed/` 中的同版本工具。checksum 与关键证据验证通过后才回收完整；
-仅成功执行、pack 或 send 都不等于本地回收完成。
+本PR使用上文审核数据提取，源文件选择、去重、校验和小包验证均由review_bundle完成。
+旧full-backup的整包解压/全文件清单属于历史备份契约，不再作为本PR默认回收义务。
+逻辑大小、实际磁盘占用和Pod配额仍须分别报告；工具只查看文件系统余量，不冒充真实quota遥测。
 
 
 ## 共享宿主池误报与旧批次恢复
@@ -237,7 +241,7 @@ output，归档包含它们。已完成suite/产物按原入口验证并跳过�
 `accounted`是逻辑文件量，不能当allocated占用或quota遥测；已观察18.12GiB与du28G差异，原因未确认。
 因此配置容量减该统计与5% margin不保证是实际配额余量下界。当前恢复器修复误杀，但未提供实时quota查询。
 
-### 当前旧批次的正确命令（88977ec镜像）
+### 仅存储失败时的恢复命令（88977ec镜像，已完成批次不执行）
 
 用户已看到 `STORAGE RECOVERY: declared=200 GB; accounted=18.12 GiB; ...`。
 这是恢复入口的启动检查提示，不是performance完成或GPU验收通过。**已经运行时不要再次启动。**
@@ -279,10 +283,5 @@ python /workspace/resume-storage.py --output "$ADALN_OUTPUT" --volume-gb 200
 不加 `--start`，不换输出目录，不运行旧runner直接恢复来绕过已知误停逻辑。
 保持原CUDA环境；当前会话原本已配置GPU=0、CUDA_HOME和PATH，不因下载改变它们。
 
-运行结束后，在同一Pod终端打包：
-
-```bash
-python .cache/adaln-indexed/evidence_io.py --pack "$ADALN_OUTPUT"
-```
-
-未完成/失败批次加 `--partial`。打包失败停止；本地完整性验证通过后才可宣布回收。
+恢复完成后只使用上文 `review_bundle.py extract/verify` 提取审核数据。
+这里的恢复控制器不是打包器；不要接回旧全量 `evidence_io.py --pack` 命令。

@@ -7,9 +7,9 @@
     ".cache/adaln-indexed/test_disk_pressure.py": "1be8891286ba671399e5d4e93149c98c7cdab6409a0709be32ed789bb90100d2",
     ".cache/adaln-indexed/test_acceptance_reuse.py": "1dea33cb5a3377f799eeebe90ca861542e8525d6cadcfcc58c96cf91cc84dd18",
     ".cache/adaln-indexed/spec.md": "0ed4255ebdb2243fc6e0f75e069401891e6911239cd1b69f6f6127e6e29a15a4",
-    ".cache/adaln-indexed/evidence_io.py": "173466cf247592a0a6858d3c7b19097d9b40446b2f6df43d9a8fb1fb4f9a1030",
+    ".cache/adaln-indexed/evidence_io.py": "fbae485387d3437686eedff8d6abb8f14275be5495376a1d9f78dc0428d61f88",
     ".cache/adaln-indexed/run_ticket05.py": "4a44f82ab6370e1acac5b670e5245afa0368d1eb19c325dac5d0e1c7de5079c2",
-    ".cache/adaln-indexed/acceptance-pr-v2.md": "5ece89fd57b8c3cbf8c18b1a86e9a3e2ba88e8d566bc27f433519c5563f1d75a",
+    ".cache/adaln-indexed/acceptance-pr-v2.md": "08259e62fb507d584ec2081ae8e7e6bc68ee24e0a83ef476801c358a7e8b9a78",
     ".cache/adaln-indexed/benchmark_adaln_indexed.py": "6b2f53b44e964a0ff33981283aa2cf9b6ab56e5c95817728084d0240f42a173b",
     ".cache/adaln-indexed/test_publish_preflight.py": "1393e784d5d111b878ce348676ba9b911a24b7263693092ea51f3187c51c7968",
     ".cache/adaln-indexed/storage.py": "90933829bbb24693349c3ec9651a3d1993dd714d2cdf0a0621063e39245c2d7d",
@@ -22,5 +22,6 @@
     ".cache/adaln-indexed/issues/06-target-qualification-and-strict.md": "e69ae8200433571d9a9e93225775fbce13ba556a9b3fb5468ce48dc1313a80f5"
   },
   "storage_profile": "adaln-indexed-storage-v1",
-  "storage_supervision_profile": "shared-pool-fixed-floor-v2"
+  "storage_supervision_profile": "shared-pool-fixed-floor-v2",
+  "review_bundle_profile": "adaln-indexed-pr-review-v1"
 }
