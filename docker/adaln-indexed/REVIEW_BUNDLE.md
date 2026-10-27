@@ -26,6 +26,35 @@
 这份包支持原执行报告/样本/指令的审核，不支持恢复完整运行目录或离线重算所有oracle/GPU输出。
 反事实/数学正确性仍需看源码、独立测试与原报告，不能用缓存hash代替。
 
+## 固定版本下载命令（当前已完成批次）
+
+在能够访问保留Volume的终端运行；Pod仍Stop时不执行，不因此重跑验收。
+当前工具source commit：`56b0163db8d4473273aa22109f1a3dcdfcdf481f`，SHA256：`3bd85836f2bc9c201362f52afcec1225f2d6e2e07205959a03029e74a28eeb8e`。
+仅下载一个Python文件，无curl或第三方依赖；校验失败不安装、不执行。
+
+```bash
+python - <<'PYTHON'
+import hashlib
+from pathlib import Path
+from urllib.request import urlopen
+
+url = "https://raw.githubusercontent.com/hongleng/RL-Kernel/56b0163db8d4473273aa22109f1a3dcdfcdf481f/docker/adaln-indexed/review_bundle.py"
+expected = "3bd85836f2bc9c201362f52afcec1225f2d6e2e07205959a03029e74a28eeb8e"
+with urlopen(url, timeout=30) as response:
+    data = response.read()
+if hashlib.sha256(data).hexdigest() != expected:
+    raise SystemExit("下载SHA256校验失败，停止")
+target = Path("/workspace/review-bundle.py")
+temporary = target.with_suffix(".py.tmp")
+temporary.write_bytes(data)
+temporary.replace(target)
+print("审核数据提取工具下载及校验成功")
+PYTHON
+```
+
+下载成功后执行当前文档的 `extract`，不要执行旧 `--pack` 或重新运行benchmark。
+包内candidate源码是原执行版本，里面的历史运行命令不作为当前操作说明；当前操作以此处extract/verify为准。
+
 ## 在可访问保留Volume的终端执行
 
 准备期间保持Pod停止；该脚本是纯CPU文件处理，不调用CUDA、Torch、编译或GPU验收。

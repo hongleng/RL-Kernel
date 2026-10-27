@@ -1,5 +1,8 @@
 # indexed AdaLN 本 PR 验收范围 v2（2026-10-27，Asia/Shanghai）
 
+> 当前已有执行完成的Volume数据：只使用本文“当前PR：只提取审核所需数据”和配套verify。
+> 不执行新批次--start、历史存储恢复或旧全量打包命令。Pod保持Stop直到工具与访问安排准备好。
+
 这是本 PR 新批次的范围修订，取代新批次的旧默认性能预算。旧 ticket06/07、
 runpod-0607、expected-performance-plan 和历史批次保持历史身份；不能用 v2
 给旧三 session 计划补 PASS。普通算子 Git checkout 不含这些 ignored 材料。
@@ -46,7 +49,7 @@ runpod-0607、expected-performance-plan 和历史批次保持历史身份；不�
 >=16 GiB available 是原下限而非峰值保证；oracle、cache、重复源码和解包审核需要充足磁盘
 （当前锁定容量预算与模板设置见下节）。不要为估时额外创建 session/Pod。
 
-## 用户下一次可直接执行的入口
+## 仅新建批次时启动（当前已完成批次不要执行）
 
 本轮准备存储修复镜像；发布身份以成功 Actions 的 image-evidence/image-reference.txt 为准。
 旧 `520e90e` 镜像缺少存储防护，不能用它运行下列新批次。
@@ -122,6 +125,35 @@ python3 review-bundle.py verify \
 `--dest`保留可直接阅读的报告、样本和展开源码，拒绝覆盖已有目录。只有本地返回 `REVIEW_BUNDLE_VERIFIED` 才能宣布这份PR审核数据回收成功；GPU、性能及指令接受仍需审核。
 当前工具面向已完成的17suite/单session批次；未完成批次不要用旧 `--partial` 混作这份审核包。
 
+
+## 固定版本下载命令（当前已完成批次）
+
+在能够访问保留Volume的终端运行；Pod仍Stop时不执行，不因此重跑验收。
+当前工具source commit：`56b0163db8d4473273aa22109f1a3dcdfcdf481f`，SHA256：`3bd85836f2bc9c201362f52afcec1225f2d6e2e07205959a03029e74a28eeb8e`。
+仅下载一个Python文件，无curl或第三方依赖；校验失败不安装、不执行。
+
+```bash
+python - <<'PYTHON'
+import hashlib
+from pathlib import Path
+from urllib.request import urlopen
+
+url = "https://raw.githubusercontent.com/hongleng/RL-Kernel/56b0163db8d4473273aa22109f1a3dcdfcdf481f/docker/adaln-indexed/review_bundle.py"
+expected = "3bd85836f2bc9c201362f52afcec1225f2d6e2e07205959a03029e74a28eeb8e"
+with urlopen(url, timeout=30) as response:
+    data = response.read()
+if hashlib.sha256(data).hexdigest() != expected:
+    raise SystemExit("下载SHA256校验失败，停止")
+target = Path("/workspace/review-bundle.py")
+temporary = target.with_suffix(".py.tmp")
+temporary.write_bytes(data)
+temporary.replace(target)
+print("审核数据提取工具下载及校验成功")
+PYTHON
+```
+
+下载成功后执行当前文档的 `extract`，不要执行旧 `--pack` 或重新运行benchmark。
+包内candidate源码是原执行版本，里面的历史运行命令不作为当前操作说明；当前操作以此处extract/verify为准。
 
 ## 全部脚本与自动调用顺序
 
