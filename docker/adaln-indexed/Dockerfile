@@ -26,5 +26,6 @@ COPY --from=runtime /opt/adaln-indexed-image-checks/cpu/cpu.log /cpu.log
 COPY --from=runtime /opt/adaln-indexed-image-checks/image-packages.txt /image-packages.txt
 COPY --from=runtime /opt/adaln-indexed-image-checks/candidate/node-lock.json /node-lock.json
 COPY --from=runtime /opt/adaln-indexed-image-checks/candidate/performance-plan.json /performance-plan.json
+COPY --from=runtime /opt/adaln-indexed-image-checks/candidate/storage-plan.json /storage-plan.json
 COPY --from=runtime /opt/adaln-indexed-image-checks/candidate/candidate.json /candidate.json
 COPY --from=runtime /opt/adaln-indexed-image-checks/candidate/source-sha256.json /source-sha256.json

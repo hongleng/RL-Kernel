@@ -3,19 +3,23 @@
   "base_image": "ghcr.io/hongleng/rl-kernel/adaln-h100@sha256:682fae9afbb852c75c7b519e9b80645e6528c0d8d034d29ed4bd35f0a5073ce4",
   "acceptance_profile": "pr-v2",
   "acceptance_sha256": {
-    ".cache/adaln-indexed/acceptance-pr-v2.md": "4154881c6655ac4c83a43edd11d396e8a0ddf3ebaf935ad8e497df2e93cd2057",
     ".cache/adaln-indexed/audit_ticket05_artifacts.py": "818cfe2ab28ab493cab72900427094c5a08895108ffaa27eaea09600f88a5cd7",
-    ".cache/adaln-indexed/benchmark_adaln_indexed.py": "426c63258c1f7b5b2761a7e5a769861532133d28b4f5f60aabb1edf9edb93f68",
-    ".cache/adaln-indexed/evidence_io.py": "13811ae21f0e20f3cf8906e2d6a8e73abdeec107800257ba95f950a212fac729",
-    ".cache/adaln-indexed/issues/06-target-qualification-and-strict.md": "e69ae8200433571d9a9e93225775fbce13ba556a9b3fb5468ce48dc1313a80f5",
-    ".cache/adaln-indexed/issues/07-indexed-benchmark.md": "2bce8ec7f01e1b51085f6014d61b7cbabad150258a7fe9c8b02e26dffad1a148",
-    ".cache/adaln-indexed/run_ticket05.py": "4a44f82ab6370e1acac5b670e5245afa0368d1eb19c325dac5d0e1c7de5079c2",
-    ".cache/adaln-indexed/run_ticket0607.py": "513fece43f982c412d052334c1bb8d143b9601935df06f5b01db59e62e3df838",
-    ".cache/adaln-indexed/runpod-0607.md": "4e99d634ed8b13b28611661885343212da08dfffc7bf65ba3e649aa638f18f3d",
-    ".cache/adaln-indexed/spec.md": "0ed4255ebdb2243fc6e0f75e069401891e6911239cd1b69f6f6127e6e29a15a4",
+    ".cache/adaln-indexed/test_disk_pressure.py": "1be8891286ba671399e5d4e93149c98c7cdab6409a0709be32ed789bb90100d2",
     ".cache/adaln-indexed/test_acceptance_reuse.py": "1dea33cb5a3377f799eeebe90ca861542e8525d6cadcfcc58c96cf91cc84dd18",
-    ".cache/adaln-indexed/test_benchmark_adaln_indexed.py": "1bc987490be9cc0f0725c7a861f7fdc0c8e8a306a1ba5bc837dd523b95fcc5df",
+    ".cache/adaln-indexed/spec.md": "0ed4255ebdb2243fc6e0f75e069401891e6911239cd1b69f6f6127e6e29a15a4",
+    ".cache/adaln-indexed/evidence_io.py": "173466cf247592a0a6858d3c7b19097d9b40446b2f6df43d9a8fb1fb4f9a1030",
+    ".cache/adaln-indexed/run_ticket05.py": "4a44f82ab6370e1acac5b670e5245afa0368d1eb19c325dac5d0e1c7de5079c2",
+    ".cache/adaln-indexed/acceptance-pr-v2.md": "35b1b7ddf2c0029522d28f9cf1779658971c796287adbaac3f445ed878e764d4",
+    ".cache/adaln-indexed/benchmark_adaln_indexed.py": "6b2f53b44e964a0ff33981283aa2cf9b6ab56e5c95817728084d0240f42a173b",
     ".cache/adaln-indexed/test_publish_preflight.py": "1393e784d5d111b878ce348676ba9b911a24b7263693092ea51f3187c51c7968",
-    ".cache/adaln-indexed/test_ticket0607.py": "c1ba9c3e588ba9082f804da05832258c427311fab0f482830a8dc0a097b58ff5"
-  }
+    ".cache/adaln-indexed/storage.py": "9a838739184d7217a601eb46ffb3ba153a7b13fba2c6fab36923bf2b419fa562",
+    ".cache/adaln-indexed/test_ticket0607.py": "c1ba9c3e588ba9082f804da05832258c427311fab0f482830a8dc0a097b58ff5",
+    ".cache/adaln-indexed/test_benchmark_adaln_indexed.py": "1bc987490be9cc0f0725c7a861f7fdc0c8e8a306a1ba5bc837dd523b95fcc5df",
+    ".cache/adaln-indexed/test_storage.py": "4a7f7b6bb3e612ff008e213eab5887ff61dbb4eb8d434fc250e1dcb188152c1c",
+    ".cache/adaln-indexed/run_ticket0607.py": "c6c85bdee90481fcda0dce7009d51c38cd51429f5e26f3e42cc1109cbe5c3fec",
+    ".cache/adaln-indexed/runpod-0607.md": "4e99d634ed8b13b28611661885343212da08dfffc7bf65ba3e649aa638f18f3d",
+    ".cache/adaln-indexed/issues/07-indexed-benchmark.md": "2bce8ec7f01e1b51085f6014d61b7cbabad150258a7fe9c8b02e26dffad1a148",
+    ".cache/adaln-indexed/issues/06-target-qualification-and-strict.md": "e69ae8200433571d9a9e93225775fbce13ba556a9b3fb5468ce48dc1313a80f5"
+  },
+  "storage_profile": "adaln-indexed-storage-v1"
 }

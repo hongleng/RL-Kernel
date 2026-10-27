@@ -16,6 +16,8 @@ import time
 import traceback
 from zoneinfo import ZoneInfo
 
+import storage
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -32,6 +34,9 @@ HELPERS = (
     ".cache/adaln-indexed/evidence_io.py",
     ".cache/adaln-indexed/test_acceptance_reuse.py",
     ".cache/adaln-indexed/test_publish_preflight.py",
+    ".cache/adaln-indexed/test_disk_pressure.py",
+    ".cache/adaln-indexed/storage.py",
+    ".cache/adaln-indexed/test_storage.py",
     ".cache/adaln-indexed/acceptance-pr-v2.md",
     ".cache/adaln-indexed/spec.md",
     ".cache/adaln-indexed/issues/06-target-qualification-and-strict.md",
@@ -52,6 +57,13 @@ def write(path, value):
     temporary = path.with_name(path.name + ".tmp")
     temporary.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n")
     temporary.replace(path)
+
+
+def record_failure(out, name, value):
+    try:
+        write(next_attempt(out / "failures", name), value)
+    except OSError as exc:
+        print(f"Cannot persist failure record: {exc}", file=sys.stderr, flush=True)
 
 
 def inventory(root=ROOT):
@@ -91,16 +103,24 @@ def execute(command, log, *, cwd=ROOT, env=None):
         status = "FAIL"
         timestamp = datetime.now(ZoneInfo("Asia/Shanghai")).isoformat()
         try:
-            subprocess.run(
-                command, cwd=cwd, env=env, stdout=stream, stderr=subprocess.STDOUT, check=True
-            )
+            if env and "RLK_ADALN_DISK_FLOOR_BYTES" in env:
+                storage.supervised_run(command, cwd=cwd, env=env, stdout=stream)
+            else:
+                subprocess.run(
+                    command, cwd=cwd, env=env, stdout=stream, stderr=subprocess.STDOUT, check=True
+                )
             status = "COMPLETE"
         finally:
             elapsed = time.monotonic() - started
-            write(
-                log.with_name(log.name + ".timing.json"),
-                dict(state=status, started=timestamp, elapsed_seconds=elapsed, command=command),
-            )
+            try:
+                write(
+                    log.with_name(log.name + ".timing.json"),
+                    dict(state=status, started=timestamp, elapsed_seconds=elapsed, command=command),
+                )
+            except OSError as exc:
+                print(f"Cannot persist timing for {log.name}: {exc}", file=sys.stderr, flush=True)
+                if status == "COMPLETE":
+                    raise
             print(status, log.name, f"{elapsed:.1f}s", flush=True)
 
 
@@ -135,6 +155,8 @@ def cpu_preflight(package, dest):
         ".cache/adaln-indexed/test_ticket0607.py",
         ".cache/adaln-indexed/test_benchmark_adaln_indexed.py",
         ".cache/adaln-indexed/test_publish_preflight.py",
+        ".cache/adaln-indexed/test_disk_pressure.py",
+        ".cache/adaln-indexed/test_storage.py",
         "tests/reference/test_adaln_indexed.py",
         "tests/runtime/test_adaln_strict_policy.py",
     )
@@ -239,6 +261,11 @@ def prepare(out, sessions=1, profile="pr-v2"):
     candidate = json.loads((out / "candidate.json").read_text())
     candidate["node_lock_sha256"] = sha(out / "node-lock.json")
     candidate["performance_plan_sha256"] = sha(out / "performance-plan.json")
+    write(
+        out / "storage-plan.json",
+        storage.budget(json.loads((out / "performance-plan.json").read_text())),
+    )
+    candidate["storage_plan_sha256"] = sha(out / "storage-plan.json")
     candidate["sessions"] = sessions
     candidate["profile"] = profile
     write(out / "candidate.json", candidate)
@@ -260,6 +287,8 @@ def verify_candidate(out):
         raise RuntimeError("node list identity changed")
     if sha(out / "performance-plan.json") != candidate["performance_plan_sha256"]:
         raise RuntimeError("performance plan identity changed")
+    if sha(out / "storage-plan.json") != candidate["storage_plan_sha256"]:
+        raise RuntimeError("storage plan identity changed")
     baseline = json.loads((out / "source-sha256.json").read_text())
     if inventory() != baseline or inventory(out / "candidate-source") != baseline:
         raise RuntimeError("source/harness identity changed; prepare a new candidate")
@@ -334,6 +363,9 @@ def receipt(directory):
 
 
 def verify_saved_evidence(out, state):
+    for record in state.get("storage_checks", []):
+        if sha(out / record["path"]) != record["sha256"]:
+            raise RuntimeError("prior storage check changed")
     for namespace in ("completed", "artifacts", "sessions", "preflight"):
         for name, record in state.get(namespace, {}).items():
             if receipt(out / record["path"]) != record["receipt"]:
@@ -384,13 +416,25 @@ def check_result(out, task, directory=None):
     verify_reports(nodes, reports)
 
 
+def record_storage(out, state, label, plan):
+    check = storage.check_batch(out, plan)
+    path = next_attempt(out / "storage-checks", label)
+    write(path, check)
+    state.setdefault("storage_checks", []).append(
+        dict(path=str(path.relative_to(out)), sha256=sha(path))
+    )
+    return check
+
+
 def run(out, phase, sessions):
     state = json.loads((out / "state.json").read_text())
     try:
         verify_candidate(out)
         if sessions != json.loads((out / "candidate.json").read_text())["sessions"]:
             raise RuntimeError("session count differs from locked plan")
+        storage_plan = json.loads((out / "storage-plan.json").read_text())
         verify_saved_evidence(out, state)
+        storage_state = record_storage(out, state, "startup", storage_plan)
         if not state.get("preflight"):
             dest = next_attempt(out / "preflight", "cpu")
             dest.mkdir()
@@ -432,7 +476,16 @@ def run(out, phase, sessions):
         verify_saved_evidence(out, state)
         state.update(state="RUNNING", error=None, traceback=None)
         write(out / "state.json", state)
-        env = dict(os.environ, OMP_NUM_THREADS="1")
+        scratch = out / "runtime-tmp"
+        scratch.mkdir(exist_ok=True)
+        env = dict(
+            os.environ,
+            OMP_NUM_THREADS="1",
+            TMPDIR=str(scratch),
+            CUDA_CACHE_PATH=str(out / "driver-cache"),
+            RLK_ADALN_STORAGE_ROOT=str(out),
+            RLK_ADALN_DISK_FLOOR_BYTES=str(storage_state["disk_floor_bytes"]),
+        )
         correctness, sanitizers = tasks()
         selected = (
             correctness if phase == "correctness" else sanitizers if phase == "sanitizer" else []
@@ -449,6 +502,8 @@ def run(out, phase, sessions):
                 check_result(out, task, out / state["completed"][name]["path"])
                 continue
             verify_candidate(out)
+            storage_state = record_storage(out, state, name, storage_plan)
+            env["RLK_ADALN_DISK_FLOOR_BYTES"] = str(storage_state["disk_floor_bytes"])
             dest = next_attempt(out / "runs", name)
             backend, suite, tool = task
             command = [
@@ -488,8 +543,22 @@ def run(out, phase, sessions):
         write(out / "progress.json", dict(stage=state["state"]))
     except (Exception, KeyboardInterrupt) as exc:
         state.update(state="FAIL", error=str(exc), traceback=traceback.format_exc())
-        write(next_attempt(out / "failures", "batch"), state)
-    write(out / "state.json", state)
+        summary = (
+            f"child process exited {exc.returncode}; see the stage log"
+            if isinstance(exc, subprocess.CalledProcessError)
+            else str(exc)
+        )
+        print("BATCH FAILED:", summary, file=sys.stderr, flush=True)
+        record_failure(out, "batch", state)
+    try:
+        write(out / "state.json", state)
+    except OSError as exc:
+        state["state"] = "FAIL"
+        print(
+            f"Cannot persist state; last saved checkpoint retained: {exc}",
+            file=sys.stderr,
+            flush=True,
+        )
     print(state["state"], out, flush=True)
     return int(state["state"] == "FAIL")
 
@@ -505,6 +574,10 @@ def extract_artifacts(out, state, env):
         if name in state["artifacts"]:
             continue
         verify_candidate(out)
+        storage_state = record_storage(
+            out, state, "stage", json.loads((out / "storage-plan.json").read_text())
+        )
+        env["RLK_ADALN_DISK_FLOOR_BYTES"] = str(storage_state["disk_floor_bytes"])
         source = out / state["completed"][name]["path"]
         dest = next_attempt(out / "artifacts", name)
         dest.mkdir()
@@ -597,6 +670,10 @@ def performance(out, state, sessions, env):
             if receipt(out / record["path"]) != record["receipt"]:
                 raise RuntimeError("performance evidence changed")
             continue
+        storage_state = record_storage(
+            out, state, "stage", json.loads((out / "storage-plan.json").read_text())
+        )
+        env["RLK_ADALN_DISK_FLOOR_BYTES"] = str(storage_state["disk_floor_bytes"])
         dest = next_attempt(out / "performance", str(session))
         verify_candidate(out)
         package = out / "performance-source" / dest.name
@@ -665,10 +742,43 @@ def main(argv=None):
     parser.add_argument("--profile", choices=("pr-v2",), default="pr-v2")
     parser.add_argument("--sessions", type=int, choices=(1,), default=1)
     parser.add_argument("--start", action="store_true", help="prepare then run the complete batch")
+    parser.add_argument(
+        "--storage-plan",
+        action="store_true",
+        help="print CPU-only capacity budget; no output creation/GPU",
+    )
     args = parser.parse_args(argv)
     out = args.output.resolve()
-    if sum((args.prepare, args.start, args.cpu_preflight)) > 1:
-        parser.error("--prepare, --start and --cpu-preflight are mutually exclusive")
+    if sum((args.prepare, args.start, args.cpu_preflight, args.storage_plan)) > 1:
+        parser.error(
+            "--prepare, --start, --cpu-preflight and --storage-plan are mutually exclusive"
+        )
+    if args.storage_plan or args.start:
+        from benchmark_adaln_indexed import parse_args, plan
+
+        capacity = storage.budget(
+            plan(parse_args(["--output", str(out), "--profile", args.profile]))
+        )
+        if args.storage_plan:
+            summary = dict(
+                oracle_payloads=len(capacity["oracle_cases"]),
+                oracle_limit_gib=round(capacity["oracle_limit_bytes"] / storage.GIB, 3),
+                other_artifacts_limit_gib=capacity["other_artifacts_limit_bytes"] / storage.GIB,
+                archive_reserve_gib=round(capacity["archive_limit_bytes"] / storage.GIB, 3),
+                unpack_reserve_gib=round(capacity["unpack_limit_bytes"] / storage.GIB, 3),
+                required_empty_volume_free_gib=round(
+                    capacity["required_empty_volume_free_bytes"] / storage.GIB, 3
+                ),
+                recommended_volume_gb=capacity["recommended_volume_gb"],
+            )
+            print(json.dumps(summary, indent=2))
+            return 0
+        # Fail before collection, preflight or any GPU query if storage is unsafe.
+        try:
+            storage.check_batch(out, capacity)
+        except (OSError, storage.StoragePressure) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
     if args.cpu_preflight:
         out.mkdir(parents=True, exist_ok=False)
         cpu_preflight(ROOT, out)
@@ -679,14 +789,18 @@ def main(argv=None):
             prepare(out, args.sessions, args.profile)
         except (Exception, KeyboardInterrupt) as exc:
             if was_new and out.exists():
-                write(
-                    next_attempt(out / "failures", "prepare"),
+                record_failure(
+                    out,
+                    "prepare",
                     dict(state="FAIL", error=str(exc), traceback=traceback.format_exc()),
                 )
                 state_path = out / "state.json"
-                saved = json.loads(state_path.read_text()) if state_path.exists() else {}
-                saved.update(state="FAIL", error=str(exc))
-                write(state_path, saved)
+                try:
+                    saved = json.loads(state_path.read_text()) if state_path.exists() else {}
+                    saved.update(state="FAIL", error=str(exc))
+                    write(state_path, saved)
+                except OSError as secondary:
+                    print(f"Cannot persist preparation state: {secondary}", file=sys.stderr)
             print("FAIL preparing:", exc, file=sys.stderr)
             return 1
         if args.prepare:

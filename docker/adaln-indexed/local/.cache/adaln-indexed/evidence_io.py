@@ -11,6 +11,8 @@ import shutil
 import tarfile
 import tempfile
 
+import storage
+
 
 def sha(path):
     digest = hashlib.sha256()
@@ -208,6 +210,9 @@ def validate_tree(out, *, partial=False):
             continue
         if sha(out / file) != candidate[field]:
             raise RuntimeError("candidate identity mismatch: " + file)
+    if "storage_plan_sha256" in candidate:
+        if sha(out / "storage-plan.json") != candidate["storage_plan_sha256"]:
+            raise RuntimeError("storage plan identity mismatch")
     baseline = read(out / "source-sha256.json") if (out / "source-sha256.json").exists() else {}
     for name, digest in baseline.items():
         if sha(out / "candidate-source" / name) != digest:
@@ -220,6 +225,22 @@ def validate_tree(out, *, partial=False):
             raise RuntimeError("referenced artifact escapes batch")
         return path
 
+    if (
+        "storage_plan_sha256" in candidate
+        and state.get("completed")
+        and not state.get("storage_checks")
+    ):
+        raise RuntimeError("missing runtime storage checks")
+    for record in state.get("storage_checks", []):
+        probe = out / record["path"]
+        if not probe.resolve().is_relative_to(out.resolve()) or sha(probe) != record["sha256"]:
+            raise RuntimeError("storage check identity mismatch")
+        check = read(probe)
+        if (
+            check["mount"] != "/workspace"
+            or check["free_bytes"] < check["required_remaining_bytes"]
+        ):
+            raise RuntimeError("invalid runtime storage check")
     lock = read(out / "node-lock.json") if (out / "node-lock.json").exists() else {}
     if not partial and (
         state["state"] != "EXECUTION_COMPLETE_REVIEW_PENDING"
@@ -356,6 +377,10 @@ def pack(out, *, partial=False):
 
 def pack_locked(out, *, partial=False):
     status = validate_tree(out, partial=partial)
+    size, files = storage.tree_stats(out)
+    # Reserve an incompressible tar plus its simultaneously expanded verification copy.
+    tar_bound = size + files * 8192 + size // 100 + storage.MIB
+    storage.require_free(out.parent, tar_bound + size + files * 4096 + storage.CONTROL_RESERVE)
     status["recovery"] = "LOCAL_VERIFICATION_PENDING"
     # A link outside this batch could silently disappear during transport.
     for path in out.rglob("*"):
@@ -380,10 +405,19 @@ def pack_locked(out, *, partial=False):
 
 
 def verify_archive(archive, candidate_sha256, *, partial=False):
+    archive = archive.resolve()
     digest = Path(str(archive) + ".sha256").read_text().split()[0]
     if sha(archive) != digest:
         raise RuntimeError("archive checksum mismatch")
-    with tempfile.TemporaryDirectory(prefix="adaln-recovery-") as temporary:
+    with tarfile.open(archive) as stream:
+        members = stream.getmembers()
+        expanded = sum(m.size for m in members if m.isfile())
+        storage.require_free(
+            archive.parent,
+            expanded + len(members) * 4096 + storage.CONTROL_RESERVE,
+            files=len(members) + 4096,
+        )
+    with tempfile.TemporaryDirectory(prefix="adaln-recovery-", dir=archive.parent) as temporary:
         root = Path(temporary)
         with tarfile.open(archive) as stream:
             members = stream.getmembers()

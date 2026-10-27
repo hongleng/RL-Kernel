@@ -28,8 +28,11 @@ def main():
     )
     subprocess.run(["git", "checkout", "--quiet", "--detach", "FETCH_HEAD"], cwd=out, check=True)
     # Overlay bytes are locked separately from the operator commit.
-    actual = {str(p.relative_to(assets / "local")): hashlib.sha256(p.read_bytes()).hexdigest()
-              for p in (assets / "local").rglob("*") if p.is_file() and "__pycache__" not in p.parts}
+    actual = {
+        str(p.relative_to(assets / "local")): hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in (assets / "local").rglob("*")
+        if p.is_file() and "__pycache__" not in p.parts
+    }
     if actual != config["acceptance_sha256"]:
         raise RuntimeError("acceptance overlay differs from source.json lock")
     shutil.copytree(assets / "local", out, dirs_exist_ok=True,
@@ -43,6 +46,7 @@ def main():
         "requirements.txt",
         "expected-node-lock.json",
         "expected-performance-plan.json",
+        "expected-storage-plan.json",
         "README.md",
     ):
         shutil.copyfile(assets / name, metadata / name)

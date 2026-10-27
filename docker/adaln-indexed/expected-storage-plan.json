@@ -1,0 +1,212 @@
+{
+  "schema": "adaln-indexed-storage-v1",
+  "state": "COMMAND_PREPARED",
+  "oracle_cases": [
+    {
+      "case": {
+        "shape": [
+          2,
+          8,
+          2
+        ],
+        "dtype": "fp32",
+        "route": "alternating",
+        "layout": "strided"
+      },
+      "tensor_bytes": 2464,
+      "file_limit_bytes": 1051040
+    },
+    {
+      "case": {
+        "shape": [
+          2,
+          8,
+          2
+        ],
+        "dtype": "bf16",
+        "route": "alternating",
+        "layout": "strided"
+      },
+      "tensor_bytes": 1984,
+      "file_limit_bytes": 1050560
+    },
+    {
+      "case": {
+        "shape": [
+          3,
+          4096,
+          3072
+        ],
+        "dtype": "fp32",
+        "route": "random",
+        "layout": "contiguous"
+      },
+      "tensor_bytes": 2266079232,
+      "file_limit_bytes": 2267127808
+    },
+    {
+      "case": {
+        "shape": [
+          3,
+          4096,
+          3072
+        ],
+        "dtype": "fp32",
+        "route": "segmented",
+        "layout": "contiguous"
+      },
+      "tensor_bytes": 2266079232,
+      "file_limit_bytes": 2267127808
+    },
+    {
+      "case": {
+        "shape": [
+          3,
+          4096,
+          3072
+        ],
+        "dtype": "bf16",
+        "route": "random",
+        "layout": "contiguous"
+      },
+      "tensor_bytes": 1812873216,
+      "file_limit_bytes": 1813921792
+    },
+    {
+      "case": {
+        "shape": [
+          3,
+          4096,
+          3072
+        ],
+        "dtype": "bf16",
+        "route": "segmented",
+        "layout": "contiguous"
+      },
+      "tensor_bytes": 1812873216,
+      "file_limit_bytes": 1813921792
+    },
+    {
+      "case": {
+        "shape": [
+          3,
+          6889,
+          3072
+        ],
+        "dtype": "fp32",
+        "route": "random",
+        "layout": "strided"
+      },
+      "tensor_bytes": 3810530028,
+      "file_limit_bytes": 3811578604
+    },
+    {
+      "case": {
+        "shape": [
+          3,
+          6889,
+          3072
+        ],
+        "dtype": "fp32",
+        "route": "segmented",
+        "layout": "contiguous"
+      },
+      "tensor_bytes": 3810530028,
+      "file_limit_bytes": 3811578604
+    },
+    {
+      "case": {
+        "shape": [
+          3,
+          6889,
+          3072
+        ],
+        "dtype": "bf16",
+        "route": "random",
+        "layout": "strided"
+      },
+      "tensor_bytes": 3048440556,
+      "file_limit_bytes": 3049489132
+    },
+    {
+      "case": {
+        "shape": [
+          3,
+          6889,
+          3072
+        ],
+        "dtype": "bf16",
+        "route": "segmented",
+        "layout": "contiguous"
+      },
+      "tensor_bytes": 3048440556,
+      "file_limit_bytes": 3049489132
+    },
+    {
+      "case": {
+        "shape": [
+          3,
+          6032,
+          3072
+        ],
+        "dtype": "fp32",
+        "route": "random",
+        "layout": "contiguous"
+      },
+      "tensor_bytes": 3336633024,
+      "file_limit_bytes": 3337681600
+    },
+    {
+      "case": {
+        "shape": [
+          3,
+          6032,
+          3072
+        ],
+        "dtype": "fp32",
+        "route": "segmented",
+        "layout": "contiguous"
+      },
+      "tensor_bytes": 3336633024,
+      "file_limit_bytes": 3337681600
+    },
+    {
+      "case": {
+        "shape": [
+          3,
+          6032,
+          3072
+        ],
+        "dtype": "bf16",
+        "route": "random",
+        "layout": "contiguous"
+      },
+      "tensor_bytes": 2669320896,
+      "file_limit_bytes": 2670369472
+    },
+    {
+      "case": {
+        "shape": [
+          3,
+          6032,
+          3072
+        ],
+        "dtype": "bf16",
+        "route": "segmented",
+        "layout": "contiguous"
+      },
+      "tensor_bytes": 2669320896,
+      "file_limit_bytes": 2670369472
+    }
+  ],
+  "oracle_limit_bytes": 33902438416,
+  "other_artifacts_limit_bytes": 8589934592,
+  "evidence_limit_bytes": 42492373008,
+  "archive_limit_bytes": 43409329333,
+  "unpack_limit_bytes": 44885427115,
+  "control_reserve_bytes": 268435456,
+  "required_empty_volume_free_bytes": 131860871280,
+  "recommended_volume_gb": 150,
+  "policy": "one compact payload per logical case; 8 GiB bounded allowance for other evidence; archive and isolated verification coexist; filesystem overhead and control reserve",
+  "scope": "CPU capacity model and enforced limits; not a measured GPU cache requirement"
+}

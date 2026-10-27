@@ -16,6 +16,8 @@ import time
 
 import torch
 
+import storage
+
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -247,17 +249,27 @@ def cached_references(case, seed, cache):
         data = torch.load(payload, map_location="cpu", weights_only=True)
         reused = True
     else:
+        file_limit = storage.oracle_bytes(case) + storage.MIB
+        floor = int(os.environ.get("RLK_ADALN_DISK_FLOOR_BYTES", storage.CONTROL_RESERVE))
+        storage.require_free(cache, floor + file_limit)
         directory.mkdir(parents=True)
         dtype = torch.float32 if case["dtype"] == "fp32" else torch.bfloat16
         inputs = make_inputs(tuple(case["shape"]), dtype, case["route"], seed=seed)
         fixed, gold = reference_outputs(inputs)
         data = dict(
-            inputs=tuple(t.detach() for t in inputs),
-            fixed=tuple(t.detach() for t in fixed),
-            gold=tuple(t.detach() for t in gold),
-            baseline=baseline_reference_outputs(inputs),
+            inputs=tuple(t.detach().clone(memory_format=torch.contiguous_format) for t in inputs),
+            fixed=tuple(t.detach().clone(memory_format=torch.contiguous_format) for t in fixed),
+            gold=tuple(t.detach().clone(memory_format=torch.contiguous_format) for t in gold),
+            baseline=tuple(
+                t.clone(memory_format=torch.contiguous_format)
+                for t in baseline_reference_outputs(inputs)
+            ),
         )
-        torch.save(data, payload)
+        temporary_payload = directory / "oracle.pt.tmp"
+        torch.save(data, temporary_payload)
+        if temporary_payload.stat().st_size > file_limit:
+            raise storage.StoragePressure("oracle exceeded the compact payload bound")
+        temporary_payload.replace(payload)
         temporary = meta.with_suffix(".json.tmp")
         temporary.write_text(
             json.dumps(dict(identity=identity, sha256=_sha256(payload)), indent=2) + "\n"
@@ -269,7 +281,14 @@ def cached_references(case, seed, cache):
         inputs,
         (data["fixed"], data["gold"]),
         (data["fixed"], data["baseline"]),
-        dict(key=key, sha256=_sha256(payload), reused=reused, path=str(directory)),
+        dict(
+            key=key,
+            sha256=_sha256(payload),
+            reused=reused,
+            path=str(directory),
+            file_bytes=payload.stat().st_size,
+            tensor_bytes=storage.oracle_bytes(case),
+        ),
     )
 
 
@@ -500,6 +519,10 @@ def main(argv=None):
     try:
         if not torch.cuda.is_available() or torch.version.hip is not None:
             raise RuntimeError("NVIDIA CUDA required; no performance result produced")
+        if "RLK_ADALN_DISK_FLOOR_BYTES" not in os.environ:
+            raise storage.StoragePressure(
+                "GPU benchmark requires the batch storage guard; use run_ticket0607.py"
+            )
         report["environment"] = environment()
         events = None
         with (
@@ -507,6 +530,7 @@ def main(argv=None):
             (out / "samples.jsonl").open("x") as raw,
         ):
             for case_index, case in enumerate(report["cases"]):
+                storage.require_free(out, int(os.environ["RLK_ADALN_DISK_FLOOR_BYTES"]))
                 print("ORACLE", case_index + 1, "/", len(report["cases"]), case, flush=True)
                 preparation = time.perf_counter()
                 cpu, references, baseline_references, oracle = cached_references(
@@ -611,7 +635,9 @@ def main(argv=None):
                     )
                     + "\n"
                 )
-                (out / "report.json").write_text(json.dumps(report, indent=2) + "\n")
+                report_tmp = out / "report.json.tmp"
+                report_tmp.write_text(json.dumps(report, indent=2) + "\n")
+                report_tmp.replace(out / "report.json")
                 print("CASE COMPLETE", case_index + 1, "/", len(report["cases"]), flush=True)
         report["state"] = "EXECUTION_COMPLETE_REVIEW_PENDING"
     except (Exception, KeyboardInterrupt) as exc:
@@ -624,7 +650,17 @@ def main(argv=None):
         for p in (out / name).rglob("*")
         if p.is_file()
     }
-    (out / "report.json").write_text(json.dumps(report, indent=2) + "\n")
+    try:
+        report_tmp = out / "report.json.tmp"
+        report_tmp.write_text(json.dumps(report, indent=2) + "\n")
+        report_tmp.replace(out / "report.json")
+    except OSError as exc:
+        print(
+            f"Cannot persist performance report: {exc}; {report.get('error', '')}",
+            file=sys.stderr,
+            flush=True,
+        )
+        report["state"] = "FAIL"
     print(report["state"], out)
     return int(report["state"] == "FAIL")
 

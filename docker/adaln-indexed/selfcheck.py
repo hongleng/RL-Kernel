@@ -77,6 +77,7 @@ def main():
         for actual, locked in (
             ("node-lock.json", "expected-node-lock.json"),
             ("performance-plan.json", "expected-performance-plan.json"),
+            ("storage-plan.json", "expected-storage-plan.json"),
         ):
             assert json.loads((candidate / actual).read_text()) == json.loads(
                 (root / "image-acceptance" / locked).read_text()
