@@ -257,3 +257,29 @@ def test_batch_space_reserves_archive_and_verification_on_resume(tmp_path, monke
     free -= 1
     with pytest.raises(storage.StoragePressure):
         storage.check_batch(tmp_path, plan)
+
+
+def test_shared_pool_fluctuation_does_not_abort_batch_with_available_volume(tmp_path, monkeypatch):
+    import subprocess
+
+    plan = storage.budget(bench.plan(bench.parse_args(["--output", "/unused"])))
+    marker = tmp_path / "worker-complete"
+    reported_floor = int(260003.79 * storage.GIB)
+    start_free = reported_floor + plan["evidence_limit_bytes"]
+    monkeypatch.setattr(storage, "mounted_volume", lambda path: dict(mount="/workspace"))
+    monkeypatch.setattr(
+        storage.shutil, "disk_usage",
+        lambda path: SimpleNamespace(
+            free=int(260003.54 * storage.GIB) if marker.exists() else start_free
+        ),
+    )
+    check = storage.check_batch(tmp_path, plan)
+    with (tmp_path / "worker.log").open("w") as log:
+        result = storage.supervised_run(
+            [sys.executable, "-c", f"from pathlib import Path; Path({str(marker)!r}).touch()"],
+            cwd=tmp_path,
+            env=dict(os.environ, RLK_ADALN_STORAGE_ROOT=str(tmp_path),
+                     RLK_ADALN_DISK_FLOOR_BYTES=str(check["disk_floor_bytes"])),
+            stdout=log, interval=5,
+        )
+    assert isinstance(result, subprocess.CompletedProcess) and result.returncode == 0

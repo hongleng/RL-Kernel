@@ -166,7 +166,7 @@ FP32 gold、FP64 baseline。CPU 小样本实测旧 view 会连同未使用的 ba
 | 加文件系统余量、向上取25GB档后的 Volume Disk 配置 | **150 GB** |
 
 8GiB 是明确的运行预算池，不是实测 GPU 缓存峰值；超出会 BLOCKED_STORAGE，保留材料，
-再依据实际情况审查预算。150GB 也是模板推荐容量，实际可用空间检查才决定能否启动。
+再依据实际情况审查预算。150GB 也是模板推荐容量，文件系统余量是启动检查之一；共享宿主池的statvfs数值不能证明Pod配额，另需核对配置容量与卷内占用。
 已有批次恢复时按已占 evidence 扣除未来增量，归档和解包预留仍保留；旧 attempt 不自动删除。
 
 模板：Private / NVIDIA GPU，Container Disk 40GB 用于系统，Volume Disk **150GB**，
@@ -188,7 +188,7 @@ root overlay、tmpfs、ramfs，以及覆盖输出的嵌套挂载；同时检查�
 恢复与各阶段会重新检查容量，结果保存在 `storage-checks/`，预算锁在 `storage-plan.json`。
 
 GPU 子进程每秒由父进程做常数成本的可用空间/inode检查，不在采样期间遍历/hash目录。
-超过本批未来增量配额时向独立进程组发 SIGINT，最多等主进程2秒，再对残留进程组发 SIGKILL；阻止依赖阶段
+文件系统剩余量低于固定归档/解包/控制底线时向独立进程组发 SIGINT，最多等主进程2秒，再对残留进程组发 SIGKILL；阻止依赖阶段
 继续运行。此监督不是 agent 对远端长任务的反复轮询，也不自动 Stop/Terminate Pod。
 控制阈值保留归档/解包及失败记录空间；无法保证其他进程瞬间占满同一文件系统时的写入。
 
@@ -209,3 +209,26 @@ pack 前按实际文件数和体积检查归档+解包空间，verify 前按归�
 本地回收验证需要同一镜像版本的 **evidence_io.py 和 storage.py** 两个相邻文件，或使用
 本仓库 `.cache/adaln-indexed/` 中的同版本工具。checksum 与关键证据验证通过后才回收完整；
 仅成功执行、pack 或 send 都不等于本地回收完成。
+
+
+## 共享宿主池误报与旧批次恢复
+
+200GB Volume 上只用28G却报 need260003.79GiB/have260003.54GiB 的事故，已用CPU反例精确复现。
+旧floor=启动pool free减未来evidence增量，把其他租户/任务造成的宿主池变化当作本批增长。
+现改为固定 archive+unpack+1GiB 底线；每阶段和完成前另核对保留证据预算。
+这项监测是共享文件系统余量监测，不能宣称是Pod配额实时监测；旧“实际卷可用空间”表述过强。
+
+旧88977ec镜像的本次BLOCKED_STORAGE批次可用infra里的 `resume_storage_v1.py` 受控恢复：
+保持旧镜像/Pod/候选目录原样，下载与修复commit绑定的恢复控制器到 `/workspace/resume-storage.py`，
+先执行 `python /workspace/resume-storage.py --output "$ADALN_OUTPUT" --volume-gb 200 --check-only`。
+成功后去掉 `--check-only` 才会启动恢复。只接受已记录存储失败、17suite及产物全部齐备、
+没有已接受session且旧helper/plan/candidate/receipts身份匹配的批次。
+
+控制器只替换父进程的存储检查，保留原candidate/worker字节；控制器副本与明确policy记录进入
+output，归档包含它们。已完成suite/产物按原入口验证并跳过；失败性能保留旧attempt，
+新进程重跑完整18cases，不跨进程拼接样本。新完成结果仍须人工审核。
+
+`--volume-gb 200`来自用户核对的Pod配置；阶段检查会计入整卷文件、额外5%规划余量，
+不能把它写成云平台quota实测。运行期间不遍历目录干扰采样；因此该控制器仍不提供
+实时quota遥测，也不保证突发的外部写入不会用尽Pod配额。结束前再复核，失败不登记为完成。
+无需重建Pod或等待新镜像；不要手改原锁/候选源码或直接绕过identity检查。

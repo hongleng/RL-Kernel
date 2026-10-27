@@ -531,6 +531,7 @@ def run(out, phase, sessions):
         if phase in ("all", "performance"):
             performance(out, state, sessions, env)
         verify_candidate(out)
+        record_storage(out, state, "completion", storage_plan)
         if (sha(binary) if binary.exists() else None) != initial_binary:
             raise RuntimeError("checkout _C.so changed")
         required = {task_name(t) for t in sum(tasks(), [])}

@@ -138,7 +138,8 @@ def check_batch(output, plan):
         evidence_bytes=used,
         required_remaining_bytes=required,
         # Monitor filesystem growth without walking files during timed samples.
-        disk_floor_bytes=available - (plan["evidence_limit_bytes"] - used),
+        # statvfs may expose a shared pool: unrelated writers must not move our threshold.
+        disk_floor_bytes=plan["archive_limit_bytes"] + plan["unpack_limit_bytes"] + GIB,
     )
 
 
