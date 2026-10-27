@@ -219,9 +219,9 @@ pack 前按实际文件数和体积检查归档+解包空间，verify 前按归�
 这项监测是共享文件系统余量监测，不能宣称是Pod配额实时监测；旧“实际卷可用空间”表述过强。
 
 旧88977ec镜像的本次BLOCKED_STORAGE批次可用infra里的 `resume_storage_v1.py` 受控恢复：
-保持旧镜像/Pod/候选目录原样，下载与修复commit绑定的恢复控制器到 `/workspace/resume-storage.py`，
-先执行 `python /workspace/resume-storage.py --output "$ADALN_OUTPUT" --volume-gb 200 --check-only`。
-成功后去掉 `--check-only` 才会启动恢复。只接受已记录存储失败、17suite及产物全部齐备、
+保持旧镜像/Pod/候选目录原样。按下方Python下载/校验命令取得固定恢复控制器，
+再直接运行恢复命令；入口自动先校验。`--check-only`仅在希望检查后退出时使用，不要求默认重复预检。
+只接受已记录存储失败、17suite及产物全部齐备、
 没有已接受session且旧helper/plan/candidate/receipts身份匹配的批次。
 
 控制器只替换父进程的存储检查，保留原candidate/worker字节；控制器副本与明确policy记录进入
@@ -232,3 +232,57 @@ output，归档包含它们。已完成suite/产物按原入口验证并跳过�
 不能把它写成云平台quota实测。运行期间不遍历目录干扰采样；因此该控制器仍不提供
 实时quota遥测，也不保证突发的外部写入不会用尽Pod配额。结束前再复核，失败不登记为完成。
 无需重建Pod或等待新镜像；不要手改原锁/候选源码或直接绕过identity检查。
+
+
+`accounted`是逻辑文件量，不能当allocated占用或quota遥测；已观察18.12GiB与du28G差异，原因未确认。
+因此配置容量减该统计与5% margin不保证是实际配额余量下界。当前恢复器修复误杀，但未提供实时quota查询。
+
+### 当前旧批次的正确命令（88977ec镜像）
+
+用户已看到 `STORAGE RECOVERY: declared=200 GB; accounted=18.12 GiB; ...`。
+这是恢复入口的启动检查提示，不是performance完成或GPU验收通过。**已经运行时不要再次启动。**
+以下命令用于尚未启动恢复的同一旧批次，不用于创建新批次。
+
+Pod镜像没有curl，使用已有Python标准库下载；固定commit与SHA256，校验成功后原子替换。
+下载/校验失败时停止，不执行恢复命令；不用安装工具，不改候选源码或锁。
+
+```bash
+cd /opt/RL-Kernel-indexed
+export ADALN_OUTPUT=/workspace/evidence/adaln-indexed-storage-v1
+python - <<'PYTHON'
+import hashlib
+from pathlib import Path
+from urllib.request import urlopen
+
+url = "https://raw.githubusercontent.com/hongleng/RL-Kernel/e5773e6210d4ca0da878fc7c8386ef5b7f9aa55e/docker/adaln-indexed/resume_storage_v1.py"
+expected = "888d36fe66791d353e2dd4eced5fd64120c42167eecd46c76748c9da1a9f0d04"
+with urlopen(url, timeout=30) as response:
+    data = response.read()
+if hashlib.sha256(data).hexdigest() != expected:
+    raise SystemExit("下载SHA256校验失败，停止")
+target = Path("/workspace/resume-storage.py")
+temporary = target.with_suffix(".py.tmp")
+temporary.write_bytes(data)
+temporary.replace(target)
+print("下载及SHA256校验成功")
+PYTHON
+```
+
+只有显示“下载及SHA256校验成功”后执行：
+
+```bash
+python /workspace/resume-storage.py --output "$ADALN_OUTPUT" --volume-gb 200
+```
+
+这条命令自动先核对身份/receipts/容量估算，再恢复；无需默认另跑一次相同的检查。
+只想检查而不启动时，可在最后加 `--check-only`。实际Volume Disk配置必须确为200GB。
+不加 `--start`，不换输出目录，不运行旧runner直接恢复来绕过已知误停逻辑。
+保持原CUDA环境；当前会话原本已配置GPU=0、CUDA_HOME和PATH，不因下载改变它们。
+
+运行结束后，在同一Pod终端打包：
+
+```bash
+python .cache/adaln-indexed/evidence_io.py --pack "$ADALN_OUTPUT"
+```
+
+未完成/失败批次加 `--partial`。打包失败停止；本地完整性验证通过后才可宣布回收。
