@@ -1,4 +1,9 @@
 FROM docker.io/pytorch/pytorch@sha256:9859f8978cdfad549d72baa41d0b0bb7a5b46210a1446e09bf32600a968badb8 AS environment
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git g++ ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && git --version && c++ --version && nvcc --version \
+    && command -v timeout tar sha256sum
 RUN python -m pip install --no-cache-dir pytest==8.3.5 ninja==1.11.1.4 tabulate==0.9.0
 ENV PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1
 
