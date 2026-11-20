@@ -1,0 +1,6 @@
+# Explicit COPY below needs the credential-free standalone .git for comparison.
+**/__pycache__
+**/*.pyc
+**/.venv
+**/build
+**/*.so
