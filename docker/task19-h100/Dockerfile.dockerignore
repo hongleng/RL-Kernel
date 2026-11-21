@@ -2,5 +2,6 @@
 **/__pycache__
 **/*.pyc
 **/.venv
-**/build
+# Scope caches to the checkout root; tests/build is tracked source.
+source/build
 **/*.so

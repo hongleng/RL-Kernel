@@ -64,7 +64,8 @@ def git(repo, *args):
 
 def check_source(repo):
     require(git(repo, "rev-parse", "HEAD") == HEAD, "checkout does not match PR #707 pin")
-    require(not git(repo, "status", "--porcelain"), "checkout must be clean")
+    dirty = git(repo, "status", "--porcelain")
+    require(not dirty, "checkout must be clean:\n" + dirty)
     git(repo, "cat-file", "-e", BASE + "^{commit}")
     require(
         not git(repo, "diff", BASE, HEAD, "--", "csrc", "build_tools", "setup.py"),
