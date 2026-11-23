@@ -1,11 +1,11 @@
 # Task19 main integration：预编译 H100 验证镜像
 
-当前运行说明，2026-11-23。状态：本地配置已更新，未构建、未发布，尚无新 digest。
+当前运行说明，2026-11-23。状态：已获准推送 PR 集成分支和 infra 分支并触发 GHCR 构建；尚无新 digest。
 这是新批次；旧 H100 包和旧镜像 digest 只证明旧源码，不作本批 PASS。
 
 ## 固定身份与资源
 
-- 候选：`4c9ee6dcce483cf99a8385ef0a4da63fd3ed6b11`，本地 DCO merge commit，尚未 push。
+- 候选：`4c9ee6dcce483cf99a8385ef0a4da63fd3ed6b11`，DCO merge commit。
 - baseline：`e9d52e95226b62d826f0a224bafad2cab3ed7538`，权威 upstream/main，含 #495 / #547。
 - 基础镜像保持官方 PyTorch 2.4.1 / CUDA 12.4 devel 固定 digest，见 Dockerfile。
 - 单张完整 H100（80GB / NVL 均可）、非 MIG；建议 8 vCPU / 32GB RAM、80GB 容器磁盘。
@@ -52,17 +52,14 @@ python3 -I docker/task19-h100/test_run.py
 Docker ignore 只排除 source/build 等缓存，保留 tracked tests/build。
 CPU checks 不建立 H100 PASS；实际基础镜像内的 Torch/CUDA 兼容性须由 Docker 构建与 GPU 运行确认。
 
-## 构建发布：等待推送授权
+## 构建发布
 
-上一阶段明确禁止 push 和远端 PR 变更，此次尚未解除。因此没有推送候选提交、infra 分支或触发远端构建。
-用 Actions 需要先获准把候选提交推到独立镜像源码分支，以及推送 infra 分支。
-这样不更新 PR #707 的源分支、正文或评论；workflow 仅 checkout 固定 SHA。
-workflow 文件名已在 fork 默认分支登记，授权后可在新 infra ref 手动触发：
+用户已授权推送 `feat/task19-portable-logp` 与 `infra/task19-main-h100-image` 并触发 GHCR。
+直接使用 PR 分支上的固定 SHA，不创建额外镜像源码分支；PR 正文和评论保持现状。
+以下为发布入口，已触发的同版本批次不要重复提交，实际 run/digest 见 publication.json：
 
 ```bash
-# 仅在获得推送及发布授权后执行。
-git -C /home/dnd/personal-project/RL-Kernel-task19 push origin \
-  4c9ee6dcce483cf99a8385ef0a4da63fd3ed6b11:refs/heads/image/task19-main-h100-4c9ee6dc
+git -C /home/dnd/personal-project/RL-Kernel-task19 push origin feat/task19-portable-logp
 git push --set-upstream origin infra/task19-main-h100-image
 gh workflow run task19-h100-image.yml --repo hongleng/RL-Kernel \
   --ref infra/task19-main-h100-image
