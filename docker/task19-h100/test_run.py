@@ -3,6 +3,7 @@
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import sysconfig
@@ -61,8 +62,10 @@ class EvidenceCLI(unittest.TestCase):
                 runner_sha256=runner.digest(self.out / "runner.py"),
                 builder_sha256=runner.digest(self.out / "builder.py"),
                 dockerfile_sha256=runner.digest(self.out / "Dockerfile"),
+                gpu_plan_sha256=runner.digest(runner.GPU_PLAN),
             ),
         )
+        shutil.copyfile(runner.GPU_PLAN, self.out / "gpu-plan.json")
         self.write_xml()
         cases = [
             dict(
@@ -83,6 +86,7 @@ class EvidenceCLI(unittest.TestCase):
                 head=runner.HEAD,
                 baseline=runner.BASE,
                 dirty="",
+                backward="native fused_logp_backward; FP32 upstream, input-dtype gradient",
                 cases=cases,
                 extension_sha256=runner.digest(self.out / "native.so"),
                 python_source_sha256={
@@ -100,18 +104,24 @@ class EvidenceCLI(unittest.TestCase):
                 state="PASS",
                 experimental_tma_executed=False,
                 generic_native_forward=True,
-                torch_backward=True,
+                native_fused_backward=True,
             ),
         )
 
-    def write_xml(self, count=82, child=""):
-        (self.out / "gpu.xml").write_text(
-            "<testsuites><testsuite>"
-            + "".join(
-                f'<testcase name="case-{i}">{child if i == 0 else ""}</testcase>'
-                for i in range(count)
+    def write_xml(self, count=None, child=""):
+        nodes = runner.load_plan()["nodeids"]
+        if count is None:
+            count = len(nodes)
+        cases = []
+        for i, node in enumerate(nodes[:count]):
+            path, name = node.split("::", 1)
+            classname = path.removesuffix(".py").replace("/", ".")
+            cases.append(
+                f'<testcase classname="{classname}" name="{name}">'
+                f'{child if i == 0 else ""}</testcase>'
             )
-            + "</testsuite></testsuites>"
+        (self.out / "gpu.xml").write_text(
+            "<testsuites><testsuite>" + "".join(cases) + "</testsuite></testsuites>"
         )
 
     def verify(self):
@@ -132,10 +142,23 @@ class EvidenceCLI(unittest.TestCase):
         self.assertNotEqual(self.verify().returncode, 0)
 
     def test_skipped_or_missing_gpu_cases_are_rejected(self):
-        for count, child in ((82, "<skipped/>"), (81, "")):
+        total = len(runner.load_plan()["nodeids"])
+        for count, child in ((total, "<skipped/>"), (total - 1, "")):
             with self.subTest(count=count, child=child):
                 self.write_xml(count, child)
                 self.assertNotEqual(self.verify().returncode, 0)
+
+    def test_replaced_node_is_rejected_even_at_the_same_count(self):
+        path = self.out / "gpu.xml"
+        path.write_text(path.read_text().replace('name="test_', 'name="wrong_test_', 1))
+        self.assertNotEqual(self.verify().returncode, 0)
+
+    def test_old_pytorch_backward_claim_is_rejected(self):
+        path = self.out / "comparison.json"
+        report = json.loads(path.read_text())
+        report["backward"] = "existing PyTorch VJP; CUDA native forward and variants"
+        runner.save(path, report)
+        self.assertNotEqual(self.verify().returncode, 0)
 
     def test_wrong_source_is_rejected(self):
         runner.save(self.out / "source.json", dict(head="wrong batch", baseline=runner.BASE))
@@ -184,6 +207,7 @@ class EvidenceCLI(unittest.TestCase):
             runner_sha256=runner.digest(SCRIPT),
             builder_sha256=runner.digest(SCRIPT.with_name("build_image.py")),
             dockerfile_sha256=runner.digest(SCRIPT.with_name("Dockerfile")),
+            gpu_plan_sha256=runner.digest(runner.GPU_PLAN),
             extension_sha256=runner.digest(binary),
             build_log_sha256=runner.digest(self.out / "build.log"),
         )

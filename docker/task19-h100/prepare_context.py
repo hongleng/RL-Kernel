@@ -36,7 +36,14 @@ def prepare(repo, out):
     assets = Path(__file__).resolve().parent
     tools = out / "tools"
     tools.mkdir()
-    for name in ("run.py", "test_run.py", "build_image.py", "Dockerfile", "README.md"):
+    for name in (
+        "run.py",
+        "test_run.py",
+        "build_image.py",
+        "Dockerfile",
+        "README.md",
+        "gpu-plan.json",
+    ):
         shutil.copyfile(assets / name, tools / name)
     shutil.copyfile(assets / "Dockerfile", out / "Dockerfile")
     shutil.copyfile(assets / "Dockerfile.dockerignore", out / "Dockerfile.dockerignore")

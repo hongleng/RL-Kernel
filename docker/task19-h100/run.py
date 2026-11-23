@@ -15,19 +15,23 @@ import traceback
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-HEAD = "2f685b8eb79722eae3a135341e881207cccca4cd"
-BASE = "49941801f942428fd52ac5b66a1b0c070418724e"
+HEAD = "4c9ee6dcce483cf99a8385ef0a4da63fd3ed6b11"
+BASE = "e9d52e95226b62d826f0a224bafad2cab3ed7538"
 BASE_IMAGE = (
     "docker.io/pytorch/pytorch@sha256:"
     "9859f8978cdfad549d72baa41d0b0bb7a5b46210a1446e09bf32600a968badb8"
 )
 BUILD = Path("/opt/task19-image-build")
+GPU_PLAN = Path(__file__).with_name("gpu-plan.json")
 SELECTION = [
     "tests/ops/test_op_accuracy.py",
     "tests/ops/logprob/test_deterministic_logp.py",
+    "tests/ops/logprob/test_deterministic_logp_autograd.py",
+    "tests/backends/cuda/test_fused_logp_chunked_backward.py",
     "tests/e2e/test_rl_kernel_loss_step.py::test_minimal_rl_loss_step_fused_logp_candidate_cuda",
     "-k",
-    "not native and not sm90 and not source_locks",
+    "not native and not sm90 and not source_locks "
+    "and not long_sequence_backward_workspace and not guards_tensor_device",
 ]
 VARIANTS = {
     "apply_fp32",
@@ -102,6 +106,7 @@ def check_prebuilt(repo, build, torch):
         "build source mismatch",
     )
     require(manifest["base_image"] == BASE_IMAGE, "build base image mismatch")
+    require(manifest["gpu_plan_sha256"] == digest(GPU_PLAN), "build test selection mismatch")
     require(
         manifest["torch"] == str(torch.__version__)
         and manifest["cuda"] == torch.version.cuda
@@ -147,11 +152,47 @@ def command(repo, env, args, log=None):
             )
 
 
+def load_plan():
+    plan = json.loads(GPU_PLAN.read_text())
+    require(
+        plan["head"] == HEAD and plan["baseline"] == BASE and plan["selection"] == SELECTION,
+        "test plan source/selection mismatch",
+    )
+    require(
+        plan["nodeids"] and len(plan["nodeids"]) == len(set(plan["nodeids"])),
+        "test plan must contain unique nodes",
+    )
+    return plan
+
+
+def collect(repo, env):
+    args = [
+        sys.executable,
+        "-m",
+        "pytest",
+        "--collect-only",
+        "-q",
+        "-p",
+        "no:cacheprovider",
+        *SELECTION,
+    ]
+    result = subprocess.check_output(args, cwd=repo, env=env, text=True)
+    nodes = [line for line in result.splitlines() if line.startswith("tests/") and "::" in line]
+    require(sorted(nodes) == load_plan()["nodeids"], "collection differs from locked test nodes")
+    print(result.splitlines()[-1], flush=True)
+    return nodes
+
+
 def check_reports(out, binary_hash):
     status = json.loads((out / "status.json").read_text())
     require(status["state"] == "PASS" and status["head"] == HEAD, "batch is not PASS at pin")
     cases = ET.parse(out / "gpu.xml").getroot().findall(".//testcase")
-    require(len(cases) == 82, "GPU suite must contain exactly 82 executed cases")
+    plan = load_plan()
+    require(json.loads((out / "gpu-plan.json").read_text()) == plan, "evidence test plan mismatch")
+    observed_nodes = [
+        case.attrib["classname"].replace(".", "/") + ".py::" + case.attrib["name"] for case in cases
+    ]
+    require(sorted(observed_nodes) == plan["nodeids"], "GPU suite does not match locked test nodes")
     require(
         all(
             not list(case) or all(c.tag not in {"skipped", "failure", "error"} for c in case)
@@ -160,6 +201,10 @@ def check_reports(out, binary_hash):
         "GPU suite contains skipped/failed/error cases",
     )
     report = json.loads((out / "comparison.json").read_text())
+    require(
+        report["backward"] == "native fused_logp_backward; FP32 upstream, input-dtype gradient",
+        "comparison did not establish merged #495 native backward",
+    )
     require(
         report["head"] == HEAD and report["baseline"] == BASE and not report["dirty"],
         "comparison source identity mismatch",
@@ -222,6 +267,7 @@ def check_reports(out, binary_hash):
         and build["runner_sha256"] == digest(out / "runner.py")
         and build["builder_sha256"] == digest(out / "builder.py")
         and build["dockerfile_sha256"] == digest(out / "Dockerfile")
+        and build["gpu_plan_sha256"] == digest(out / "gpu-plan.json")
         and build["files"] == source["files"],
         "image build provenance mismatch",
     )
@@ -246,7 +292,7 @@ def check_reports(out, binary_hash):
             "state": "PASS",
             "experimental_tma_executed": False,
             "generic_native_forward": True,
-            "torch_backward": True,
+            "native_fused_backward": True,
         },
         "SM90 wrapper fallback evidence missing",
     )
@@ -290,6 +336,7 @@ def verify(out):
         "Dockerfile",
         "gpu.log",
         "gpu.xml",
+        "gpu-plan.json",
         "comparison.log",
         "comparison.json",
         "sm90-fallback.json",
@@ -302,12 +349,19 @@ def verify(out):
         "source manifest identity mismatch",
     )
     check_reports(out, actual_hashes["native.so"])
-    print("PASS: evidence checksums, source identity, 82 tests, 18 comparisons and SM90 fallback")
+    print(
+        f"PASS: evidence checksums, source identity, {len(load_plan()['nodeids'])} tests, "
+        "18 native-backward comparisons and SM90 fallback"
+    )
 
 
 def sm90_fallback(repo, out):
+    from unittest.mock import patch
+
     import torch
+
     from rl_engine.backends.cuda.logprob.logp import FusedLogpSM90Op
+    from rl_engine.backends.extension import _C
 
     # Bypass only the unused TMA-symbol constructor check. The real fallback
     # constructs FusedLogpGenericOp and executes this checkout's native extension.
@@ -317,8 +371,10 @@ def sm90_fallback(repo, out):
     x = torch.randn(6, 257, device="cuda", dtype=torch.bfloat16, requires_grad=True)
     y = torch.randint(257, (6,), device="cuda")
     upstream = torch.linspace(-1, 1, 6, device="cuda", dtype=x.dtype)
-    value = op(x, y)
-    grad = torch.autograd.grad(value, x, upstream)[0]
+    with patch.object(_C, "fused_logp_backward", wraps=_C.fused_logp_backward) as backward:
+        value = op(x, y)
+        grad = torch.autograd.grad(value, x, upstream)[0]
+        require(backward.call_count == 1, "SM90 fallback did not execute native fused backward")
     ref = x.detach().float().requires_grad_()
     expected = ref.log_softmax(-1).gather(-1, y.unsqueeze(-1)).squeeze(-1)
     expected_grad = torch.autograd.grad(expected, ref, upstream.float())[0]
@@ -334,7 +390,7 @@ def sm90_fallback(repo, out):
             state="PASS",
             experimental_tma_executed=False,
             generic_native_forward=True,
-            torch_backward=True,
+            native_fused_backward=True,
         ),
     )
 
@@ -380,6 +436,7 @@ def run(repo, out, env, image_ref):
         shutil.copyfile(BUILD / "build.log", out / "build.log")
         shutil.copyfile(Path(__file__).with_name("build_image.py"), out / "builder.py")
         shutil.copyfile(Path(__file__).with_name("Dockerfile"), out / "Dockerfile")
+        shutil.copyfile(GPU_PLAN, out / "gpu-plan.json")
         save(
             out / "source.json",
             dict(head=HEAD, baseline=BASE, files=manifest["files"]),
@@ -424,7 +481,18 @@ def run(repo, out, env, image_ref):
             _EXT_AVAILABLE and Path(_C.__file__).resolve() == binary.resolve(),
             "extension is missing or imported from an old checkout",
         )
-        for symbol in ("fused_logp", "deterministic_logp_forward_fp32"):
+        for symbol in (
+            "fused_logp",
+            "fused_logp_backward",
+            "deterministic_logp_forward_fp32",
+            "deterministic_logp_forward_with_lse",
+            "deterministic_logp_backward",
+            "deterministic_logp_forward_fp64",
+            "deterministic_logp_backward_fp64",
+            "deterministic_logp_probability",
+            "deterministic_logp_row_sum",
+            "deterministic_logp_selection",
+        ):
             require(hasattr(_C, symbol), "native symbol missing: " + symbol)
         registry = KernelRegistry()
         require(
@@ -511,20 +579,7 @@ def main():
     os.environ.clear()
     os.environ.update(env)
     if args.mode == "preflight":
-        command(
-            repo,
-            env,
-            [
-                sys.executable,
-                "-m",
-                "pytest",
-                "--collect-only",
-                "-q",
-                "-p",
-                "no:cacheprovider",
-                *SELECTION,
-            ],
-        )
+        collect(repo, env)
         print("CPU/collection preflight only; no GPU PASS or native build claimed")
     else:
         require(args.out is not None, "--out is required")

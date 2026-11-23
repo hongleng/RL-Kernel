@@ -16,43 +16,45 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           repository: hongleng/RL-Kernel
-          ref: 2f685b8eb79722eae3a135341e881207cccca4cd
+          ref: 4c9ee6dcce483cf99a8385ef0a4da63fd3ed6b11
           path: task19-pinned-source
           persist-credentials: false
       - name: Prepare pinned source and baseline; no compilation
         run: |
-          git -C task19-pinned-source fetch --no-tags --depth=1 https://github.com/RL-Align/RL-Kernel.git 49941801f942428fd52ac5b66a1b0c070418724e
+          git -C task19-pinned-source fetch --no-tags --depth=1 https://github.com/RL-Align/RL-Kernel.git e9d52e95226b62d826f0a224bafad2cab3ed7538
           python3 docker/task19-h100/prepare_context.py --repo task19-pinned-source --out "$RUNNER_TEMP/task19-context"
           echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}/task19-h100" >> "$GITHUB_ENV"
       - name: Free hosted runner disk
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@v4.4.1
+      - uses: docker/login-action@v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build once and publish; no GPU execution
         id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7.4.0
         with:
           context: ${{ runner.temp }}/task19-context
           file: ${{ runner.temp }}/task19-context/Dockerfile
           target: runtime
           platforms: linux/amd64
           push: true
-          tags: ${{ env.IMAGE }}:source-2f685b8-${{ github.sha }}
+          tags: ${{ env.IMAGE }}:source-4c9ee6d-${{ github.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=gha,scope=task19-h100
-          cache-to: type=gha,mode=max,scope=task19-h100
+          cache-from: |
+            type=gha,scope=task19-main-h100
+            type=gha,scope=task19-h100
+          cache-to: type=gha,mode=max,scope=task19-main-h100
       - name: Record published identity
         env:
           IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
@@ -64,7 +66,7 @@ jobs:
           printf '%s\n' "$GITHUB_SHA" > image-evidence/infrastructure-commit.txt
           cp docker/task19-h100/Dockerfile image-evidence/
           cat image-evidence/image-reference.txt >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: task19-h100-image-identity
           path: image-evidence/

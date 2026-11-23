@@ -14,7 +14,11 @@ WORKDIR /opt/task19-source
 # One native compilation in the entire image and validation lifecycle.
 RUN python -I /opt/task19-h100/run.py preflight --repo /opt/task19-source \
     && python -I /opt/task19-h100/test_run.py \
-    && python -I /opt/task19-h100/build_image.py
+    && PYTHONPATH=/opt/task19-source OMP_NUM_THREADS=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
+       python -m pytest -q -p no:cacheprovider tests/ops/logprob/test_fused_logp_ownership.py \
+       --junitxml=/opt/task19-image-cpu.xml \
+    && python -I /opt/task19-h100/build_image.py \
+    && cp /opt/task19-image-cpu.xml /opt/task19-image-build/cpu.xml
 
 # Copy only the one binary and its provenance; object files stay in build stage.
 FROM environment AS runtime
