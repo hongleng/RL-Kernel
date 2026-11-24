@@ -1,0 +1,26 @@
+{
+  "state": "PUBLISHED",
+  "run_id": 44916076977,
+  "run_url": "https://github.com/hongleng/RL-Kernel/actions/runs/44916076977",
+  "infrastructure_commit": "768aebb68f858dbbec01040b29b33110381e9c1e",
+  "workflow_registration_commit": "21d376d52d955633278f03d22ba35b3359dadcc0",
+  "source_commit": "2f685b8eb79722eae3a135341e881207cccca4cd",
+  "image_repository": "ghcr.io/hongleng/rl-kernel/task19-h100",
+  "image_digest": "sha256:4af7e74a5e6f71002806de8dc2c5fbd35926c75896c3488a72a1bba750ae28b3",
+  "previous_attempts": [
+    {
+      "run_id": 44700979592,
+      "infrastructure_commit": "2aa03e504ace130d9774f1c704348cb3eca1e35d",
+      "conclusion": "failure",
+      "cause": "Official PyTorch image lacks git; source identity preflight failed before native compilation"
+    },
+    {
+      "run_id": 44757308163,
+      "infrastructure_commit": "24d3f3c9e2c10733634d10dde3a25d9fe97d7ec0",
+      "conclusion": "failure",
+      "cause": "Docker ignore **/build excluded four tracked tests/build files; source clean-check failed before native compilation"
+    }
+  ],
+  "image_reference": "ghcr.io/hongleng/rl-kernel/task19-h100@sha256:4af7e74a5e6f71002806de8dc2c5fbd35926c75896c3488a72a1bba750ae28b3",
+  "anonymous_manifest_status": 200
+}

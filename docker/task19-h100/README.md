@@ -4,7 +4,15 @@
 
 源码固定 `2f685b8eb79722eae3a135341e881207cccca4cd`，baseline 固定 `49941801f942428fd52ac5b66a1b0c070418724e`。
 基础镜像为官方 PyTorch 2.4.1 / CUDA 12.4 devel 的固定 digest，见 Dockerfile。
-**当前状态：本地配置已准备，尚未执行 Docker 构建或发布，没有可使用的新镜像 digest。**
+**当前状态：构建 [#44916076977](https://github.com/hongleng/RL-Kernel/actions/runs/44916076977) 已成功发布 GHCR；2026-11-21 已核对发布 artifact，并确认匿名 manifest 返回 HTTP 200。H100 GPU 验证尚未执行。**
+
+```text
+ghcr.io/hongleng/rl-kernel/task19-h100@sha256:4af7e74a5e6f71002806de8dc2c5fbd35926c75896c3488a72a1bba750ae28b3
+```
+
+当前构建：https://github.com/hongleng/RL-Kernel/actions/runs/44916076977
+
+构建配置提交：`768aebb68f858dbbec01040b29b33110381e9c1e`；fork 默认分支 workflow 登记提交：`21d376d52d955633278f03d22ba35b3359dadcc0`。
 
 ## 与历史方案的关系
 
@@ -59,7 +67,7 @@ docker buildx build --platform linux/amd64 --target runtime \
 最终镜像复用基础环境层，仅复制 `.so` 与必要构建记录，不携带 build objects/Ninja cache。
 
 也已准备 `.github/workflows/task19-h100-image.yml`：单次 build-push，GHA cache，发布 GHCR，artifact 导出 digest 和基础设施提交。
-要在 GitHub 使用，需先提交并推送本 infra 分支，并将该 workflow 登记到 fork 默认分支。配置尚未提交/推送，也没有触发 Actions。
+要在 GitHub 使用，需先提交并推送本 infra 分支，并将该 workflow 登记到 fork 默认分支。本次已提交、推送并登记 workflow。首轮失败及修复重试见 publication.json；不要额外触发同一版本构建。
 登记完成后：
 
 ```bash
@@ -80,7 +88,7 @@ RunPod 镜像填新发布的 digest；启动命令 `sleep infinity`，不自动�
 把下面 IMAGE_REF 换成发布产物中的完整 digest（该值是外部部署身份记录，容器内无法自行验证平台实际使用的 digest）：
 
 ```bash
-IMAGE_REF='ghcr.io/hongleng/rl-kernel/task19-h100@sha256:<新发布的64位digest>'
+IMAGE_REF='ghcr.io/hongleng/rl-kernel/task19-h100@sha256:4af7e74a5e6f71002806de8dc2c5fbd35926c75896c3488a72a1bba750ae28b3'
 python -I /opt/task19-h100/build_image.py --check
 timeout --signal=INT --kill-after=30s 30m \
   python -I /opt/task19-h100/run.py run \

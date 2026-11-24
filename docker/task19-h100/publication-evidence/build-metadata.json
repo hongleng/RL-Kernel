@@ -1,0 +1,224 @@
+{
+  "buildx.build.provenance": {
+    "builder": {
+      "id": "https://github.com/hongleng/RL-Kernel/actions/runs/44916076977/attempts/1"
+    },
+    "buildType": "https://mobyproject.org/buildkit@v1",
+    "materials": [
+      {
+        "uri": "pkg:docker/pytorch/pytorch?digest=sha256:9859f8978cdfad549d72baa41d0b0bb7a5b46210a1446e09bf32600a968badb8&platform=linux%2Famd64",
+        "digest": {
+          "sha256": "9859f8978cdfad549d72baa41d0b0bb7a5b46210a1446e09bf32600a968badb8"
+        }
+      }
+    ],
+    "invocation": {
+      "configSource": {
+        "entryPoint": "Dockerfile"
+      },
+      "parameters": {
+        "frontend": "dockerfile.v0",
+        "args": {
+          "label:org.opencontainers.image.revision": "768aebb68f858dbbec01040b29b33110381e9c1e",
+          "label:org.opencontainers.image.source": "https://github.com/hongleng/RL-Kernel",
+          "target": "runtime"
+        },
+        "locals": [
+          {
+            "name": "context"
+          },
+          {
+            "name": "dockerfile"
+          }
+        ],
+        "root": {
+          "configSource": {
+            "path": "Dockerfile"
+          },
+          "request": {
+            "args": {
+              "label:org.opencontainers.image.revision": "768aebb68f858dbbec01040b29b33110381e9c1e",
+              "label:org.opencontainers.image.source": "https://github.com/hongleng/RL-Kernel",
+              "target": "runtime"
+            }
+          }
+        },
+        "compatibilityVersion": 30
+      },
+      "environment": {
+        "dockerfileVersion": "1.29.0",
+        "github_actor": "hongleng",
+        "github_actor_id": "43168359",
+        "github_event_name": "workflow_dispatch",
+        "github_event_payload": {
+          "inputs": null,
+          "ref": "refs/heads/infra/task19-h100-image",
+          "repository": {
+            "allow_forking": true,
+            "archive_url": "https://api.github.com/repos/hongleng/RL-Kernel/{archive_format}{/ref}",
+            "archived": false,
+            "assignees_url": "https://api.github.com/repos/hongleng/RL-Kernel/assignees{/user}",
+            "blobs_url": "https://api.github.com/repos/hongleng/RL-Kernel/git/blobs{/sha}",
+            "branches_url": "https://api.github.com/repos/hongleng/RL-Kernel/branches{/branch}",
+            "clone_url": "https://github.com/hongleng/RL-Kernel.git",
+            "collaborators_url": "https://api.github.com/repos/hongleng/RL-Kernel/collaborators{/collaborator}",
+            "comments_url": "https://api.github.com/repos/hongleng/RL-Kernel/comments{/number}",
+            "commits_url": "https://api.github.com/repos/hongleng/RL-Kernel/commits{/sha}",
+            "compare_url": "https://api.github.com/repos/hongleng/RL-Kernel/compare/{base}...{head}",
+            "contents_url": "https://api.github.com/repos/hongleng/RL-Kernel/contents/{+path}",
+            "contributors_url": "https://api.github.com/repos/hongleng/RL-Kernel/contributors",
+            "created_at": "2026-07-21T06:24:29Z",
+            "default_branch": "main",
+            "deployments_url": "https://api.github.com/repos/hongleng/RL-Kernel/deployments",
+            "description": "High-performance RL post-training infrastructure. Designed to achieve bitwise operator-level train-inference consistency across heterogeneous engines and extreme memory efficiency for GRPO, PPO, etc.",
+            "disabled": false,
+            "downloads_url": "https://api.github.com/repos/hongleng/RL-Kernel/downloads",
+            "events_url": "https://api.github.com/repos/hongleng/RL-Kernel/events",
+            "fork": true,
+            "forks": 0,
+            "forks_count": 0,
+            "forks_url": "https://api.github.com/repos/hongleng/RL-Kernel/forks",
+            "full_name": "hongleng/RL-Kernel",
+            "git_commits_url": "https://api.github.com/repos/hongleng/RL-Kernel/git/commits{/sha}",
+            "git_refs_url": "https://api.github.com/repos/hongleng/RL-Kernel/git/refs{/sha}",
+            "git_tags_url": "https://api.github.com/repos/hongleng/RL-Kernel/git/tags{/sha}",
+            "git_url": "git://github.com/hongleng/RL-Kernel.git",
+            "has_discussions": false,
+            "has_downloads": false,
+            "has_issues": false,
+            "has_pages": false,
+            "has_projects": true,
+            "has_pull_requests": true,
+            "has_wiki": true,
+            "homepage": "",
+            "hooks_url": "https://api.github.com/repos/hongleng/RL-Kernel/hooks",
+            "html_url": "https://github.com/hongleng/RL-Kernel",
+            "id": 1307351824,
+            "is_template": false,
+            "issue_comment_url": "https://api.github.com/repos/hongleng/RL-Kernel/issues/comments{/number}",
+            "issue_events_url": "https://api.github.com/repos/hongleng/RL-Kernel/issues/events{/number}",
+            "issues_url": "https://api.github.com/repos/hongleng/RL-Kernel/issues{/number}",
+            "keys_url": "https://api.github.com/repos/hongleng/RL-Kernel/keys{/key_id}",
+            "labels_url": "https://api.github.com/repos/hongleng/RL-Kernel/labels{/name}",
+            "language": "Python",
+            "languages_url": "https://api.github.com/repos/hongleng/RL-Kernel/languages",
+            "license": {
+              "key": "apache-2.0",
+              "name": "Apache License 2.0",
+              "node_id": "MDc6TGljZW5zZTI=",
+              "spdx_id": "Apache-2.0",
+              "url": "https://api.github.com/licenses/apache-2.0"
+            },
+            "merges_url": "https://api.github.com/repos/hongleng/RL-Kernel/merges",
+            "milestones_url": "https://api.github.com/repos/hongleng/RL-Kernel/milestones{/number}",
+            "mirror_url": null,
+            "name": "RL-Kernel",
+            "node_id": "R_kgDOTeybEA",
+            "notifications_url": "https://api.github.com/repos/hongleng/RL-Kernel/notifications{?since,all,participating}",
+            "open_issues": 0,
+            "open_issues_count": 0,
+            "owner": {
+              "avatar_url": "https://avatars.githubusercontent.com/u/43168359?v=4",
+              "events_url": "https://api.github.com/users/hongleng/events{/privacy}",
+              "followers_url": "https://api.github.com/users/hongleng/followers",
+              "following_url": "https://api.github.com/users/hongleng/following{/other_user}",
+              "gists_url": "https://api.github.com/users/hongleng/gists{/gist_id}",
+              "gravatar_id": "",
+              "html_url": "https://github.com/hongleng",
+              "id": 43168359,
+              "login": "hongleng",
+              "node_id": "MDQ6VXNlcjQzMTY4MzU5",
+              "organizations_url": "https://api.github.com/users/hongleng/orgs",
+              "received_events_url": "https://api.github.com/users/hongleng/received_events",
+              "repos_url": "https://api.github.com/users/hongleng/repos",
+              "site_admin": false,
+              "starred_url": "https://api.github.com/users/hongleng/starred{/owner}{/repo}",
+              "subscriptions_url": "https://api.github.com/users/hongleng/subscriptions",
+              "type": "User",
+              "url": "https://api.github.com/users/hongleng",
+              "user_view_type": "public"
+            },
+            "private": false,
+            "pull_request_creation_policy": "all",
+            "pulls_url": "https://api.github.com/repos/hongleng/RL-Kernel/pulls{/number}",
+            "pushed_at": "2026-11-21T14:51:09Z",
+            "releases_url": "https://api.github.com/repos/hongleng/RL-Kernel/releases{/id}",
+            "size": 39117,
+            "ssh_url": "git@github.com:hongleng/RL-Kernel.git",
+            "stargazers_count": 0,
+            "stargazers_url": "https://api.github.com/repos/hongleng/RL-Kernel/stargazers",
+            "statuses_url": "https://api.github.com/repos/hongleng/RL-Kernel/statuses/{sha}",
+            "subscribers_url": "https://api.github.com/repos/hongleng/RL-Kernel/subscribers",
+            "subscription_url": "https://api.github.com/repos/hongleng/RL-Kernel/subscription",
+            "svn_url": "https://github.com/hongleng/RL-Kernel",
+            "tags_url": "https://api.github.com/repos/hongleng/RL-Kernel/tags",
+            "teams_url": "https://api.github.com/repos/hongleng/RL-Kernel/teams",
+            "topics": [],
+            "trees_url": "https://api.github.com/repos/hongleng/RL-Kernel/git/trees{/sha}",
+            "updated_at": "2026-10-21T07:57:05Z",
+            "url": "https://api.github.com/repos/hongleng/RL-Kernel",
+            "visibility": "public",
+            "watchers": 0,
+            "watchers_count": 0,
+            "web_commit_signoff_required": false
+          },
+          "sender": {
+            "avatar_url": "https://avatars.githubusercontent.com/u/43168359?v=4",
+            "events_url": "https://api.github.com/users/hongleng/events{/privacy}",
+            "followers_url": "https://api.github.com/users/hongleng/followers",
+            "following_url": "https://api.github.com/users/hongleng/following{/other_user}",
+            "gists_url": "https://api.github.com/users/hongleng/gists{/gist_id}",
+            "gravatar_id": "",
+            "html_url": "https://github.com/hongleng",
+            "id": 43168359,
+            "login": "hongleng",
+            "node_id": "MDQ6VXNlcjQzMTY4MzU5",
+            "organizations_url": "https://api.github.com/users/hongleng/orgs",
+            "received_events_url": "https://api.github.com/users/hongleng/received_events",
+            "repos_url": "https://api.github.com/users/hongleng/repos",
+            "site_admin": false,
+            "starred_url": "https://api.github.com/users/hongleng/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/hongleng/subscriptions",
+            "type": "User",
+            "url": "https://api.github.com/users/hongleng",
+            "user_view_type": "public"
+          },
+          "workflow": ".github/workflows/task19-h100-image.yml"
+        },
+        "github_job": "image",
+        "github_ref": "refs/heads/infra/task19-h100-image",
+        "github_ref_name": "infra/task19-h100-image",
+        "github_ref_protected": "false",
+        "github_ref_type": "branch",
+        "github_repository": "hongleng/RL-Kernel",
+        "github_repository_id": "1307351824",
+        "github_repository_owner": "hongleng",
+        "github_repository_owner_id": "43168359",
+        "github_run_attempt": "1",
+        "github_run_id": "44916076977",
+        "github_run_number": "3",
+        "github_runner_arch": "X64",
+        "github_runner_environment": "github-hosted",
+        "github_runner_image_os": "ubuntu24",
+        "github_runner_image_version": "20261116.133.1",
+        "github_runner_name": "GitHub Actions 1000000061",
+        "github_runner_os": "Linux",
+        "github_runner_tracking_id": "github_5223a2c9-1c05-4771-be73-4c66d3d699ab",
+        "github_server_url": "https://github.com",
+        "github_triggering_actor": "hongleng",
+        "github_workflow": "Build Task19 H100 precompiled validation image",
+        "github_workflow_ref": "hongleng/RL-Kernel/.github/workflows/task19-h100-image.yml@refs/heads/infra/task19-h100-image",
+        "github_workflow_sha": "768aebb68f858dbbec01040b29b33110381e9c1e",
+        "platform": "linux/amd64"
+      }
+    }
+  },
+  "buildx.build.ref": "builder-e422d662-a661-48f1-b1ac-28f00fc9a7f9/builder-e422d662-a661-48f1-b1ac-28f00fc9a7f90/wnu22mggqwjnjjb5wzims3njq",
+  "containerimage.descriptor": {
+    "mediaType": "application/vnd.oci.image.index.v1+json",
+    "digest": "sha256:4af7e74a5e6f71002806de8dc2c5fbd35926c75896c3488a72a1bba750ae28b3",
+    "size": 856
+  },
+  "containerimage.digest": "sha256:4af7e74a5e6f71002806de8dc2c5fbd35926c75896c3488a72a1bba750ae28b3",
+  "image.name": "ghcr.io/hongleng/rl-kernel/task19-h100:source-2f685b8-768aebb68f858dbbec01040b29b33110381e9c1e"
+}
